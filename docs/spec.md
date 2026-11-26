@@ -3155,10 +3155,25 @@ To rename an app or topic, set its new `slug` and list its old slug under `previ
 The edit retains the database identity, task and document links, edge endpoints and
 environments. Edge code references are saved with the current app slug, retaining
 their ref, path and line suffixes. An explicit former slug resolves to its current
-owner and warns with `renamed`. Historical slugs stay reserved in the workspace
-after the owning app or topic is removed. Export and restore carry the history in
-the selected snapshot. The metadata-only v9 migration raises the writer floor
-because earlier writers can reassign historical names (D32).
+owner and warns with `renamed`. Identical rename warnings from multiple doc targets
+are reported once. Removing an app or topic retires its current and historical slugs.
+The namespaces are independent. Export and restore carry the reservations in the
+selected snapshot. The metadata-only v11 migration raises the writer floor because
+v10 writers can remove an identity without reserving its current slug (D32).
+The migration preserves recorded history. Names deleted earlier without a reservation
+cannot be recovered from the database.
+
+`ws show` lists retired slugs in comments. To release an already retired name, add
+`released: {apps: [old-api], topics: [old-topic]}` to a fresh `ws show` file and keep
+its baseline comment. The interactive editor uses its captured baseline. The release
+is scoped by app or topic, can be combined with reuse in the same edit, and needs
+the ordinary human approval for `ws edit`. A newer workspace edit invalidates the
+release draft even if it returns the map to the same visible state. The
+`released_map_slug` warning explains that a released ref may resolve to a different
+identity after reuse. Releases are one-time requests and never appear in the saved YAML.
+`ws edit --dry-run` reports typed `retired` and `released` names and `aliases_changed`
+entries, each with a topic ref, normalized additions and exact stored removals. It omits
+these optional fields when they are empty. Use the preview before requesting approval.
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
 item and its docs. Proposal-only or archived docs and document `cites` links do not pin map

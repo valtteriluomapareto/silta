@@ -11,6 +11,9 @@ extension WorkspaceConfig {
   /// Keeps retained identities and unknown columns; referenced deletions throw conflict.
   package func apply(in transaction: StorageTransaction, ids: any IDGenerator, at date: Date) throws
   {
+    guard !hasReleases else {
+      throw WorkspaceError.invalid(["Release retired slugs with ws edit."])
+    }
     _ = try applyWithChanges(in: transaction, ids: ids, at: date)
   }
 
@@ -97,7 +100,7 @@ private struct WorkspaceWriter {
       }
     }
     for key in WorkspaceConfig.fields["settings"] ?? [] { settings.removeValue(forKey: key) }
-    if !map.retired.isEmpty { settings[WorkspaceSlugs.retiredKey] = map.retired }
+    settings[WorkspaceSlugs.retiredKey] = map.retired.isEmpty ? nil : map.retired
     for (key, value) in config.root["settings"]?.mapping ?? Node.Mapping([]) {
       settings[key.string ?? ""] = value.any
     }

@@ -5,9 +5,10 @@ import SiltaCore
 struct WsEditCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit", abstract: "Edit workspace YAML (human-only).",
-    discussion: "Keep the baseline comment from ws show or a retained editor draft. "
-      + "If stale, review a fresh ws show before reapplying your edits. "
-      + "An unstamped file uses the configuration at command start.\n"
+    discussion: "Keep the baseline comment from ws show or a retained draft. "
+      + "Review fresh YAML if the draft is stale. Unstamped files use the configuration "
+      + "at command start.\n"
+      + "Release a retired app slug with released: {apps: [old-api]} and a baseline.\n"
       + "Preview map changes and blockers without approval using --dry-run -F <file>.\n"
       + "Update Acme YAML (human): silta ws edit acme -F acme.yml")
 
@@ -22,10 +23,19 @@ struct WsEditCommand: WorkspaceArgumentCommand {
             "edges": .int, "environments": .int,
           ])),
         "blockers": .array(.object(["item": .string, "references": .array(.string)])),
+        "retired": .optional(.array(.string)), "released": .optional(.array(.string)),
+        "aliases_changed": .optional(
+          .array(
+            .object(["topic": .string, "added": .array(.string), "removed": .array(.string)])
+          )),
       ])),
   ])
 
   static let workspaceSource = WorkspaceSource.argument
+
+  private static let releasedSlugWarning = OutputWarning(
+    code: "released_map_slug",
+    message: "Released references may resolve to a new identity when reused.")
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions
 
@@ -80,7 +90,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     }
     var output = receipt(selected)
     if let selected {
-      output.warnings = await EdgeCodeEvidence.warnings(
+      output.warnings += await EdgeCodeEvidence.warnings(
         workspace: selected.workspace, environment: environment)
     }
     output.approvalUsed = selected != nil && !environment.actor.isHuman
@@ -105,6 +115,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
         "Rename \(rename.kind): \(HumanText.line(rename.from)) -> \(HumanText.line(rename.to)) "
           + "(docs \(rename.docs), tasks \(rename.tasks), edges \(rename.edges), environments \(rename.environments))"
       }
+      lines += slugLines(changes)
       lines += changes.blockers.map { blocker in
         "Blocked \(HumanText.line(blocker.item)): "
           + blocker.references.map(HumanText.line).joined(separator: ", ")
@@ -115,7 +126,25 @@ struct WsEditCommand: WorkspaceArgumentCommand {
       text: lines.joined(separator: "\n"),
       data: WsEditData(
         workspace: workspace, dryRun: dryRun ? true : nil,
-        changes: dryRun || changes?.isEmpty == false ? changes : nil))
+        changes: dryRun || changes?.isEmpty == false ? changes : nil),
+      warnings: changes?.released == nil ? [] : [Self.releasedSlugWarning])
+  }
+
+  private func slugLines(_ changes: WorkspaceMapChanges) -> [String] {
+    var lines: [String] = []
+    if let retired = changes.retired {
+      lines.append("Retired slugs: " + retired.map(HumanText.line).joined(separator: ", "))
+    }
+    if let released = changes.released {
+      lines.append("Released slugs: " + released.map(HumanText.line).joined(separator: ", "))
+    }
+    for change in changes.aliasesChanged ?? [] {
+      let added = change.added.map(HumanText.line).joined(separator: ", ")
+      let removed = change.removed.map(HumanText.line).joined(separator: ", ")
+      lines.append(
+        "Aliases for \(HumanText.line(change.topic)): add [\(added)], remove [\(removed)]")
+    }
+    return lines
   }
 
 }

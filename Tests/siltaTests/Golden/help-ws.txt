@@ -30,9 +30,9 @@ SUBCOMMANDS:
 
 OVERVIEW: Edit workspace YAML (human-only).
 
-Keep the baseline comment from ws show or a retained editor draft. If stale,
-review a fresh ws show before reapplying your edits. An unstamped file uses the
-configuration at command start.
+Keep the baseline comment from ws show or a retained draft. Review fresh YAML
+if the draft is stale. Unstamped files use the configuration at command start.
+Release a retired app slug with released: {apps: [old-api]} and a baseline.
 Preview map changes and blockers without approval using --dry-run -F <file>.
 Update Acme YAML (human): silta ws edit acme -F acme.yml
 

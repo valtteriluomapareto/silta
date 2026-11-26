@@ -118,7 +118,8 @@ full_swift() {
     actualV6WriterRefusesTargetSnapshotFloorWithoutMutation \
     actualV6ExporterRefusesUnknownCounterOnlySchema \
     actualV8WriterRefusesSlugHistoryWithoutMutation \
-    actualV9SelectorRefusesWorkspaceRemovalFloor
+    actualV9SelectorRefusesWorkspaceRemovalFloor \
+    actualV10WriterRefusesMapSlugRetirementFloor
 
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.

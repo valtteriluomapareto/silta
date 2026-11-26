@@ -123,6 +123,7 @@ enum WorkspaceSlugs {
     _ kind: Kind, rows: [Node], stored: [Item], retired: [String]
   ) throws -> Plan {
     let owners = try ownership(kind, items: stored, retired: retired)
+    let unavailable = Set(retired)
     let current = Dictionary(stored.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
     var used = Set<Int64>()
     var retained: [Match] = []
@@ -130,14 +131,20 @@ enum WorkspaceSlugs {
     for (index, row) in rows.enumerated() {
       let slug = row["slug"]?.string ?? ""
       let listed = row["previous"]?.array(of: String.self) ?? []
+      if let name = ([slug] + listed).first(where: unavailable.contains) {
+        throw retiredCollision(kind, name)
+      }
       let source = try match(kind, slug: slug, previous: listed, current: current, owners: owners)
       if kind == .app, source?.slug != slug, WorkspaceConfig.reservedAppSlug(slug) {
+        let action = source == nil ? "New apps cannot use" : "Cannot rename an app to"
         throw WorkspaceError.invalid([
-          "New apps cannot use reserved slug \(slug); choose a different slug."
+          "\(action) reserved slug \(slug); choose a different slug."
         ])
       }
       if let source {
-        guard used.insert(source.id).inserted else { throw collision(kind, slug) }
+        guard used.insert(source.id).inserted else {
+          throw collision(kind, listed.first ?? slug, owner: source.slug)
+        }
         var history = source.previous.filter { $0 != slug }
         if source.slug != slug { history.append(source.slug) }
         retained.append(Match(old: source, slug: slug, previous: history))
@@ -146,7 +153,8 @@ enum WorkspaceSlugs {
         final.append(Item(id: -Int64(index) - 1, slug: slug, previous: []))
       }
     }
-    let after = Set(retired + stored.filter { !used.contains($0.id) }.flatMap(\.previous)).sorted()
+    let removed = stored.filter { !used.contains($0.id) }
+    let after = unavailable.union(removed.flatMap { [$0.slug] + $0.previous }).sorted()
     let resolved = try ownership(kind, items: final, retired: after)
     return Plan(retained: retained, retired: after, names: resolved.mapValues(\.slug))
   }
@@ -162,10 +170,15 @@ enum WorkspaceSlugs {
           "Unknown previous \(kind.rawValue) slug \(TaskError.shown(old))."
         ])
       }
-      if let match, match.id != item.id { throw collision(kind, old) }
+      if let match, match.id != item.id {
+        if current[slug] != nil { throw collision(kind, slug, owner: match.slug) }
+        throw collision(kind, old, owner: item.slug)
+      }
       match = item
     }
-    if let owner = owners[slug], owner.id != match?.id { throw collision(kind, slug) }
+    if let owner = owners[slug], owner.id != match?.id {
+      throw collision(kind, slug, owner: owner.slug)
+    }
     return match
   }
 
@@ -174,8 +187,9 @@ enum WorkspaceSlugs {
     var owners: [String: Item] = [:]
     for item in items {
       for slug in [item.slug] + item.previous {
-        guard !unavailable.contains(slug), owners.updateValue(item, forKey: slug) == nil else {
-          throw collision(kind, slug)
+        if unavailable.contains(slug) { throw retiredCollision(kind, slug) }
+        if let owner = owners.updateValue(item, forKey: slug) {
+          throw collision(kind, slug, owner: owner.slug)
         }
       }
     }
@@ -185,10 +199,17 @@ enum WorkspaceSlugs {
   static func checkTopicAliases(
     _ aliases: [(slug: String, alias: String)], history: [(owner: String?, name: String)]
   ) throws {
-    let byName = Dictionary(grouping: history) { WorkspaceConfig.normalize($0.name) }
-    for (slug, alias) in aliases
-    where byName[WorkspaceConfig.normalize(alias)]?.contains(where: { $0.owner != slug }) == true {
-      throw collision(.topic, alias)
+    let byName = Dictionary(grouping: history.sorted { $0.name < $1.name }) {
+      WorkspaceConfig.normalize($0.name)
+    }
+    for (slug, alias) in aliases {
+      if let match = byName[WorkspaceConfig.normalize(alias)]?.first(where: { $0.owner != slug }) {
+        let alias = TaskError.shown(alias)
+        let owner = match.owner.map { "belongs to topic:\(TaskError.shown($0))" } ?? "is retired"
+        throw WorkspaceError.invalid([
+          "Topic alias \(alias) conflicts with the slug \(TaskError.shown(match.name)) that \(owner)."
+        ])
+      }
     }
   }
 
@@ -200,9 +221,16 @@ enum WorkspaceSlugs {
     return CommandFailure(error: collision(kind, slug), next: [workspaceEditRead(workspace)])
   }
 
-  private static func collision(_ kind: Kind, _ slug: String) -> WorkspaceError {
-    .invalid([
-      "\(kind.rawValue.capitalized) slug \(TaskError.shown(slug)) has conflicting or reserved ownership."
-    ])
+  private static func retiredCollision(_ kind: Kind, _ slug: String) -> WorkspaceError {
+    .invalid(["\(kind.rawValue.capitalized) slug \(TaskError.shown(slug)) is retired."])
+  }
+
+  private static func collision(_ kind: Kind, _ slug: String, owner: String? = nil)
+    -> WorkspaceError
+  {
+    let detail =
+      owner.map { "belongs to \(kind.rawValue):\(TaskError.shown($0))" }
+      ?? "has conflicting or reserved ownership"
+    return .invalid(["\(kind.rawValue.capitalized) slug \(TaskError.shown(slug)) \(detail)."])
   }
 }

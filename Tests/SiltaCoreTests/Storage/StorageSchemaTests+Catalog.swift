@@ -6,7 +6,7 @@ import Testing
 @testable import SiltaCore
 
 extension StorageSchemaTests {
-  private static let writerFloors = [1, 2, 3, 4, 5, 6, 6, 8, 9, 10]
+  private static let writerFloors = [1, 2, 3, 4, 5, 6, 6, 8, 9, 10, 11]
 
   @Test func everyMigrationMatchesItsFrozenCatalogAndWriterFloor() throws {
     let migrator = StorageSchema.migrator

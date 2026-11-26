@@ -14,12 +14,29 @@ package struct WorkspaceMapChanges: Encodable, Sendable {
     package let environments: Int
   }
 
+  package struct AliasChange: Encodable, Sendable {
+    package let topic: String
+    package let added: [String]
+    package let removed: [String]
+  }
+
   package let added: [String]
   package let removed: [String]
   package let renamed: [Rename]
   package let blockers: [WorkspaceMapBlocker]
+  package let retired: [String]?
+  package let released: [String]?
+  package let aliasesChanged: [AliasChange]?
 
-  package var isEmpty: Bool { added.isEmpty && removed.isEmpty && renamed.isEmpty }
+  enum CodingKeys: String, CodingKey {
+    case added, removed, renamed, blockers, retired, released
+    case aliasesChanged = "aliases_changed"
+  }
+
+  package var isEmpty: Bool {
+    added.isEmpty && removed.isEmpty && renamed.isEmpty && retired == nil && released == nil
+      && aliasesChanged == nil
+  }
 }
 
 /// Map removal blockers and the task references that can be inspected.
@@ -49,12 +66,8 @@ struct WorkspaceMapEdit {
     let raw: String = workspace?["settings"] ?? "{}"
     let settings = try settingsObject(raw)
     let retired = try WorkspaceSlugs.retired(settings)
-    let apps = try WorkspaceSlugs.plan(
-      .app, rows: config.rows("apps"),
-      stored: WorkspaceSlugs.read(.app, workspace: id, in: db), retired: retired["app"] ?? [])
-    let topics = try WorkspaceSlugs.plan(
-      .topic, rows: config.rows("topics"),
-      stored: WorkspaceSlugs.read(.topic, workspace: id, in: db), retired: retired["topic"] ?? [])
+    let apps = try plan(.app, config: config, retired: retired, workspace: id, in: db)
+    let topics = try plan(.topic, config: config, retired: retired, workspace: id, in: db)
     try checkAliases(config.rows("topics"), plan: topics)
     let existing = try WorkspaceMapRow.read(workspace: id, in: db)
     let desired = try desiredRows(config, apps: apps)
@@ -64,14 +77,13 @@ struct WorkspaceMapEdit {
       !newKeys.contains($0.canonical(apps: apps, topics: topics).key)
     }
     let additions = desired.filter { !oldKeys.contains($0.key) }
-    for row in additions where row.table == "service" || row.table == "edge" {
-      guard let name = row.parts.last, WorkspaceConfig.isValidIdentifier(name) else {
-        throw WorkspaceError.invalid([
-          "New \(row.table) \(row.table == "service" ? "slug" : "kind") must be an identifier."
-        ])
-      }
-    }
+    try checkAdditions(additions)
     let removedIDs = Dictionary(grouping: removals, by: \.table).mapValues { Set($0.map(\.id)) }
+    let newlyRetired = typedSlugs(
+      Array(Set(apps.retired).subtracting(retired["app"] ?? [])),
+      Array(Set(topics.retired).subtracting(retired["topic"] ?? [])))
+    let released = typedSlugs(config.released(.app), config.released(.topic))
+    let aliases = try aliasChanges(config.rows("topics"), plan: topics, workspace: id, in: db)
     let changes = WorkspaceMapChanges(
       added: additions.map(\.ref).sorted(), removed: removals.map(\.ref).sorted(),
       renamed: try [.app, .topic].flatMap { kind in
@@ -79,8 +91,46 @@ struct WorkspaceMapEdit {
           try WorkspaceMapReferences.rename(kind, $0, removals: removedIDs, workspace: id, in: db)
         }
       },
-      blockers: try WorkspaceMapReferences.blockers(removals, workspace: id, in: db))
+      blockers: try WorkspaceMapReferences.blockers(removals, workspace: id, in: db),
+      retired: newlyRetired.isEmpty ? nil : newlyRetired,
+      released: released.isEmpty ? nil : released,
+      aliasesChanged: aliases.isEmpty ? nil : aliases)
     return Self(apps: apps, topics: topics, removals: removals, changes: changes)
+  }
+
+  private static func plan(
+    _ kind: WorkspaceSlugs.Kind, config: WorkspaceConfig, retired: [String: [String]],
+    workspace: Int64, in db: Database
+  ) throws -> WorkspaceSlugs.Plan {
+    let names = Set(retired[kind.rawValue] ?? [])
+    let released = Set(config.released(kind))
+    if let unknown = released.subtracting(names).sorted().first {
+      throw WorkspaceError.invalid([
+        "\(kind.rawValue.capitalized) slug \(TaskError.shown(unknown)) is not already retired."
+      ])
+    }
+    let stored = try WorkspaceSlugs.read(kind, workspace: workspace, in: db)
+    if !released.isEmpty {
+      _ = try WorkspaceSlugs.ownership(kind, items: stored, retired: names.sorted())
+    }
+    return try WorkspaceSlugs.plan(
+      kind, rows: config.rows(kind.section), stored: stored,
+      retired: names.subtracting(released).sorted())
+  }
+
+  private static func typedSlugs(_ apps: [String], _ topics: [String]) -> [String] {
+    apps.sorted().map { "app:" + TaskError.shown($0) }
+      + topics.sorted().map { "topic:" + TaskError.shown($0) }
+  }
+
+  private static func checkAdditions(_ additions: [WorkspaceMapRow]) throws {
+    for row in additions where row.table == "service" || row.table == "edge" {
+      guard let name = row.parts.last, WorkspaceConfig.isValidIdentifier(name) else {
+        throw WorkspaceError.invalid([
+          "New \(row.table) \(row.table == "service" ? "slug" : "kind") must be an identifier."
+        ])
+      }
+    }
   }
 
   private static func settingsObject(_ raw: String) throws -> [String: Any] {
@@ -104,6 +154,43 @@ struct WorkspaceMapEdit {
     }
     try WorkspaceSlugs.checkTopicAliases(
       aliases, history: prior + plan.retired.map { (nil, $0) })
+  }
+
+  private static func aliasChanges(
+    _ rows: [Node], plan: WorkspaceSlugs.Plan, workspace: Int64, in db: Database
+  ) throws -> [WorkspaceMapChanges.AliasChange] {
+    let currentSlugs = Dictionary(uniqueKeysWithValues: plan.retained.map { ($0.old.id, $0.slug) })
+    let stored = try Row.fetchAll(
+      db,
+      sql: """
+        SELECT topic.id, topic.slug, CAST(topic_alias.alias AS BLOB) AS alias FROM topic_alias
+        JOIN topic ON topic.id=topic_alias.topic_id
+        WHERE topic_alias.workspace_id=? AND topic.workspace_id=?
+        """, arguments: [workspace, workspace])
+    let before = stored.reduce(into: [String: Set<Data>]()) { result, row in
+      let slug = currentSlugs[row["id"]] ?? (row["slug"] as String)
+      result[slug, default: []].insert(row["alias"])
+    }
+    let after = Dictionary(
+      uniqueKeysWithValues: rows.map { row in
+        let normalized = (row["aliases"]?.array(of: String.self) ?? []).map(
+          WorkspaceConfig.normalize)
+        return (row["slug"]?.string ?? "", Set(normalized.map { Data($0.utf8) }))
+      })
+    return Set(before.keys).union(after.keys).sorted().compactMap { slug in
+      let old = before[slug] ?? []
+      let new = after[slug] ?? []
+      guard old != new else { return nil }
+      return WorkspaceMapChanges.AliasChange(
+        topic: "topic:" + TaskError.shown(slug),
+        added: displayAliases(new.subtracting(old)), removed: displayAliases(old.subtracting(new)))
+    }
+  }
+
+  private static func displayAliases(_ aliases: Set<Data>) -> [String] {
+    aliases.sorted { $0.lexicographicallyPrecedes($1) }.map {
+      TaskError.shown(String(bytes: $0, encoding: .utf8) ?? "<invalid UTF-8>")
+    }
   }
 
   private static func desiredRows(_ config: WorkspaceConfig, apps: WorkspaceSlugs.Plan) throws

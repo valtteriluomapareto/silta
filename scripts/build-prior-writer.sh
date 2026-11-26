@@ -26,6 +26,7 @@ prior   dc868192e3877a29d79dc54681f0f57b72c3f56f  documents
 v6      b65eab8994b7ada9f54495f9c050ebe5a3090d74  format 7
 v8      605a8a69d553be1207f1fecb649dc8e30ba70724  app and topic slug history
 v9      9e956c388729d35d23ae4d9317a901e0f7cfa1db  workspace removal
+v10     cf3f7df4a59d4b71c626781ecef36315cfa985b2  map slug retirement
 '
 
 usage() { echo 'usage: build-prior-writer.sh <output-directory> [writer] | --all <root> | --list' >&2; exit 64; }

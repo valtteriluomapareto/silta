@@ -53,6 +53,7 @@ package enum WorkspaceEditor {
     }
     try baseline.check(stamp: stamp)
     let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
+    try baseline.checkReleases(config, stamp: stamp)
     if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) {
       try store.read(baseline.check)
       return nil
@@ -73,6 +74,7 @@ package enum WorkspaceEditor {
     let (stamp, text) = try Baseline.payload(document, workspace: baseline.slug)
     try baseline.check(stamp: stamp)
     let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
+    try baseline.checkReleases(config, stamp: stamp)
     try checkSlug(config, baseline: baseline)
     guard baseline.slug != nil else { throw WorkspaceError.notFound }
     return try store.read { db in
@@ -143,6 +145,14 @@ package enum WorkspaceEditor {
       if let stamp, stamp != token { throw WorkspaceEditConflict(workspace: slug) }
     }
 
+    func checkReleases(_ config: WorkspaceConfig, stamp: Substring?) throws {
+      guard config.hasReleases, stamp == nil else { return }
+      throw CommandFailure(
+        error: WorkspaceError.invalid(["Releasing retired slugs requires a baseline from ws show."]
+        ),
+        next: [workspaceEditRead(slug)])
+    }
+
     func check(in db: Database) throws {
       if let slug {
         let current = try WorkspaceEditor.uid(in: db, slug: slug)
@@ -210,8 +220,15 @@ package enum WorkspaceEditor {
         arguments: [id])
     }
     let stored = settings ?? "{}"
-    guard identity.contains(where: { !$0.isEmpty }) || stored.contains(WorkspaceSlugs.retiredKey)
-    else { return "" }
+    if stored.contains(WorkspaceSlugs.retiredKey) {
+      // The same name can retire again after release and reuse. A new edit invalidates old drafts.
+      let revision =
+        try Int64.fetchOne(
+          db, sql: "SELECT MAX(seq) FROM change_log WHERE kind='workspace' AND row_id=?",
+          arguments: [id]) ?? 0
+      return try WorkspaceConfig.json([stored, identity, revision] as [Any])
+    }
+    guard identity.contains(where: { !$0.isEmpty }) else { return "" }
     return try WorkspaceConfig.json([stored, identity] as [Any])
   }
 

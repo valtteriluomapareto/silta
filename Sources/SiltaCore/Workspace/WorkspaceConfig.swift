@@ -68,6 +68,14 @@ package struct WorkspaceConfig {
     root[section]?.array() ?? []
   }
 
+  func released(_ kind: WorkspaceSlugs.Kind) -> [String] {
+    root["released"]?[kind.section]?.array(of: String.self) ?? []
+  }
+
+  var hasReleases: Bool {
+    WorkspaceSlugs.Kind.allCases.contains { !released($0).isEmpty }
+  }
+
   static func normalize(_ alias: String) -> String {
     alias.precomposedStringWithCanonicalMapping.lowercased()
   }
@@ -127,12 +135,28 @@ private struct WorkspaceValidation {
   }
 
   mutating func run() {
-    keys(root, allowed: Array(WorkspaceConfig.fields.keys) + ["services"])
+    keys(root, allowed: Array(WorkspaceConfig.fields.keys) + ["services", "released"])
     if root["workspace"] == nil { problem(root, "workspace is required") }
     validateSections()
+    validateReleases()
     validateIdentities()
     validateReferences()
     validateAliases()
+  }
+
+  private mutating func validateReleases() {
+    guard let release = root["released"] else { return }
+    let sections = WorkspaceSlugs.Kind.allCases.map(\.section)
+    keys(release, allowed: sections)
+    for section in sections {
+      guard let list = release[section] else { continue }
+      let names = list.array(of: String.self)
+      if list.sequence == nil || list.array().contains(where: { $0.tag != Tag(.str) })
+        || !names.allSatisfy(WorkspaceConfig.isValidIdentifier) || Set(names).count != names.count
+      {
+        problem(list, "released.\(section) must be a list of distinct slugs")
+      }
+    }
   }
 
   mutating func keys(_ node: Node, allowed: [String]) {
