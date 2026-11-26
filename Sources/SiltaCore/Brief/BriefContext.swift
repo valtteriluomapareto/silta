@@ -72,7 +72,7 @@ struct BriefContext {
             "AGENTS.md: \(TaskError.shown((git.displayWorktree ?? git.worktree) + "/AGENTS.md"))\n"
         ))
     }
-    if let group = try documents.group(kind: "app", id: id) {
+    if let group = try documents.group(kind: "app", id: id) ?? documents.gap(kind: "app", id: id) {
       sections[sections.count - 1].documents = [group]
     }
     return sections + (try neighbours(id: id, app: app, documents: documents))
@@ -103,6 +103,9 @@ struct BriefContext {
         let group = try documents.group(kind: "service", id: service)
       {
         groups.append(group)
+      }
+      if groups.isEmpty, let gap = try documents.gap(kind: "edge", id: edgeID) {
+        groups = [gap]
       }
       sections.append(
         BriefSection(

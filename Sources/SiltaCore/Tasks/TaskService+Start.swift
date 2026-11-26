@@ -116,7 +116,10 @@ extension TaskService {
           """,
         arguments: [Self.timestamp(at), task.id])
       try changed(task.id, kind: "status", body: "review", at: at, in: tx)
-      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
+      let gap = try? docGapWarning(task, workspace: slug, in: tx.database)  // advisory only
+      return receipt(
+        try Self.lookup(ref, workspace: slug, in: tx.database),
+        warnings: [gap ?? nil].compactMap { $0 })
     }
   }
 }

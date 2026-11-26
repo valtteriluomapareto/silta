@@ -9,12 +9,14 @@ struct BriefDocs {
   let topics: Set<Int64>
   let compact: Bool
   let counts: [String: Int]
+  let snapshots: Bool
 
   init(db: Database, location: BriefLocation, topics: Set<Int64>, compact: Bool) throws {
     self.db = db
     workspace = location.workspace
     workspaceID = try TaskService.workspaceID(workspace, in: db)
     self.compact = compact
+    snapshots = try DocGaps.snapshots(in: db)
     let current = try location.taskRef.map {
       try TaskService.lookup($0, workspace: location.workspace, in: db).id
     }
@@ -68,6 +70,15 @@ struct BriefDocs {
     return BriefDocGroup(ref: ref, workspace: workspace, total: total, rows: previews)
   }
 
+  /// A gap annotation for an app or edge that no accepted doc or pending proposal covers.
+  func gap(kind: String, id: Int64) throws -> BriefDocGroup? {
+    guard counts[kind + ":\(id)"] == nil,
+      try !DocGaps.covered(
+        kind: kind, id: id, workspaceID: workspaceID, snapshots: snapshots, in: db)
+    else { return nil }
+    return .gap(ref: try TaskLinkTarget(kind: kind, id: id).rendered(in: db), workspace: workspace)
+  }
+
   func topicGroups() throws -> [BriefDocGroup] {
     guard !topics.isEmpty else { return [] }
     return try Row.fetchAll(
@@ -79,13 +90,7 @@ struct BriefDocs {
     ).compactMap { try group(kind: "topic", id: $0["id"]) }
   }
 
-  private static let accepted = """
-    FROM doc d JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
-    JOIN link l ON l.from_kind='doc' AND l.from_id=d.id
-    WHERE d.workspace_id=:workspace AND l.workspace_id=:workspace AND d.archived=0
-      AND r.state='accepted' AND l.rel='about' AND l.to_id IS NOT NULL
-      AND l.to_kind IN ('app','edge','service','topic')
-    """
+  private static let accepted = DocGaps.acceptedAttachments
 
   private static func summary(_ body: String) -> String {
     let lines = HumanText.body(body).split(whereSeparator: \.isNewline).map {

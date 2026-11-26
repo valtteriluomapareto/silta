@@ -655,8 +655,8 @@ going until the list is empty or the human stops it.
 - Task mutations refuse another actor's fresh claim. Discussion posts are exempt:
   another actor's discussion never refreshes the holder's heartbeat or task write
   timestamp. A foreign holder's handoff is refused, with ordinary discussion as the
-  alternative. An unclaimed handoff records context and warns that no claim was
-  released. An owner's handoff releases only its own claim, preserving task status.
+  alternative. An unclaimed handoff records context and warns `handoff_unclaimed`
+  that no claim was released. An owner's handoff releases only its own claim, preserving task status.
   An expired claim can be reclaimed with
   `start`; each claim compares the complete actor, including session.
 
@@ -775,6 +775,20 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `status` event's body is always the new status. It releases the claim, so whoever
   reviews and merges can finish the task with `done`; the author takes it back with
   `task start` to address review findings (D41).
+- **Doc-gap hint:** the task's first `task submit` or owner's handoff (one that
+  released a claim), counting the current one, warns `doc_gap` when the task has an
+  app and an edge between that app and a different app has no doc cover: no accepted,
+  nonarchived doc about the edge and no pending proposal on a nonarchived doc naming it
+  (by target uid). Only object elements of an array target snapshot count; any other
+  snapshot, and a store that predates snapshots, gives no cover and never an error. The
+  one-line message names at most two edges in brief neighbour order, then `and N more`,
+  says to tell the human or propose one and otherwise to ignore it, and gives `silta
+  --ws <ws> doc propose <slug> --title <title> --about <first edge> --task <ref> -m
+  <why> -F -`
+  (the write has released the claim); a secret-bearing workspace or edge ref gets only
+  `with --task <ref>`. It is advisory: a failed read never refuses or changes the
+  write, and later submits and handoffs of the task stay quiet. Service edges and
+  self-edges never trigger it.
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
 - `task unlink AC-12 <map-ref> [--rel <relation>]` removes one exact, unanchored map
@@ -1741,6 +1755,14 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    Whole annotations degrade to counts or are omitted; they never displace retained
    baseline content or open tasks. Omitted rows/annotations keep `truncated` truthful.
    Secret-bearing map refs are masked and use an unfiltered scoped `doc ls` recovery.
+   **Doc gaps:** the app card and each neighbour edge that no doc covers get one bare
+   `docs: none` annotation, in short/hook mode too; it names no command because its
+   list would be empty. Covered means an accepted, nonarchived doc about the item, a
+   pending proposal naming it (the same rule as the `doc_gap` hint, §8), or, for a
+   service edge, an accepted doc about its service. Topics never get gap lines. Gap
+   lines fit only after every doc annotation has been placed, so they never change one;
+   an omitted gap line sets `truncated`. Gaps come from the data, never from which
+   annotations fitted.
 10. **Glossary**: aliases of the topics shown.
 
 Output ends with one `more:` line per complete command, e.g. `more: silta brief --task AC-15`

@@ -42,6 +42,9 @@ extension TaskService {
           OutputWarning(
             code: "handoff_unclaimed",
             message: "This task had no claim; the handoff records context only."))
+      } else if draft.kind == "handoff" {
+        let gap = try? docGapWarning(task, workspace: slug, in: tx.database)  // advisory only
+        warnings += [gap ?? nil].compactMap { $0 }
       }
       return CommentResult(
         comment: CommentDetails(row: row, task: task.ref), warnings: warnings,

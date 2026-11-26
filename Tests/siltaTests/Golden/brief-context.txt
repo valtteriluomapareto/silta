@@ -10,11 +10,15 @@ Acme task body
 app: api
 summary: Acme API
 environment: prod https://api.acme.example
+docs: none
 neighbour: edge:api/service:push/uses Acme push
+docs: none
 neighbour: edge:api/portal/calls Acme integration
 next: silta --ws 'acme' code show 'api' --lines 1 -- 'README.md'
+docs: none
 neighbour: edge:portal/api/calls Acme caller
 next: silta --ws 'acme' ws show
+docs: none
 open: AC-1 [doing, p2] Acme task
 open: AC-2 [doing, p2] Acme task (app: portal)
 glossary: messages = messaging, push

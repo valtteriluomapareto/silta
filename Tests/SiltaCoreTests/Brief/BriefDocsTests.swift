@@ -303,7 +303,7 @@ extension BriefDocsTests {
       var location = try Self.location(home, store: store)
       location.currentTask = nil
       let groups = try Self.context(store, location: location, topics: ["PAYMENTS", "billing"])
-        .flatMap(\.documents)
+        .flatMap(\.documents).filter { !$0.isGap }
       #expect(groups.map(\.ref) == ["topic:billing"])
       #expect(groups.first?.rows.first?.contains("Billing contract.") == true)
     }

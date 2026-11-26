@@ -45,6 +45,7 @@ RESULT
 
 # Workspace docs
 Read the docs beside your work; follow printed refs with doc show.
+docs: none and doc_gap mark items no doc covers; a gap alone is no reason to propose.
 Check doc ls --about <ref> before proposing lasting missing knowledge.
 Proposals stay pending; read their pinned diff and ask for a human decision.
 Editing, triage and archive need the human's exact approval.

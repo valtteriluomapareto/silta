@@ -7,15 +7,17 @@ struct BriefDocGroup: Equatable, Sendable {
   let total: Int
   let rows: [String]
 
+  /// Whether this annotation marks an item no doc covers rather than listing docs.
+  var isGap = false
+
+  /// A doc-gap annotation. It carries no command: its list would be empty.
+  static func gap(ref: String, workspace: String) -> BriefDocGroup {
+    BriefDocGroup(ref: ref, workspace: workspace, total: 0, rows: [], isGap: true)
+  }
+
   var choices: [(text: String, shown: Int)] {
-    let command: String
-    if SecretGuard.matches(in: workspace).isEmpty {
-      command =
-        "silta --ws " + shellWord(workspace) + " doc ls"
-        + (DocService.safeReference(ref) ? " --about " + shellWord(ref) : "")
-    } else {
-      command = "silta ws ls"
-    }
+    let command = DocService.listCommand(workspace: workspace, about: ref)
+    guard !isGap else { return [("docs: none\n", 0)] }
     let count = "docs: \(total) (\(command))\n"
     guard !rows.isEmpty else { return [(count, 0)] }
     return stride(from: rows.count, through: 1, by: -1).map { shown in
@@ -28,8 +30,6 @@ struct BriefDocGroup: Equatable, Sendable {
     } + [(count, 0)]
   }
 
-  static func shown(_ ref: String) -> String {
-    TaskError.shown(DocService.safeReference(ref) ? ref : ref.removingPercentEncoding ?? ref)
-  }
+  static func shown(_ ref: String) -> String { DocService.shown(ref) }
 
 }

@@ -6,6 +6,7 @@ docs about app:api:
   doc:rule-01 [reference] AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.Acm
   docs: 29 more (silta --ws 'acme' doc ls --about 'app:api')
 neighbour: edge:api/service:push/sdk Push
+docs: none
 open: AC-1 [doing, p2] Handle push
 open: AC-2 [todo, p2] Acme backlog
 open: AC-3 [todo, p2] Acme backlog

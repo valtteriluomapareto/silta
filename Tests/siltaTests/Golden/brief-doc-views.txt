@@ -1,7 +1,16 @@
 ## full
 docs about app:api:
   doc:read-first [reference] Use the fallback.
+docs: none
+docs: none
+docs: none
 ## short
 docs: 1 (silta --ws 'acme' doc ls --about 'app:api')
+docs: none
+docs: none
+docs: none
 ## hook
 docs: 1 (silta --ws 'acme' doc ls --about 'app:api')
+docs: none
+docs: none
+docs: none
