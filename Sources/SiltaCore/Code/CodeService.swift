@@ -270,7 +270,7 @@ package struct CodeService {
     }
     let fetch = "silta --ws \(shellWord(workspace)) repo fetch \(shellWord(selection.repo))"
     let recovery =
-      "For current remote code, run \(fetch) once this session, then repeat the read. "
+      "For current remote code, run \(fetch) once this session, then read the remote-tracking ref. "
       + "If fetching fails, report the cached SHA with freshness unverified."
     return [.init(code: "ref_stale", message: status + " " + recovery)]
   }

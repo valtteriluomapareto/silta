@@ -117,7 +117,9 @@ struct GuideRecipeTests {
       let next = try #require((error["next"] as? [String])?.first)
       let retry = try fixture.execute(jsonCodeRead(next), task: "AC-1")
       try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
-      #expect(try code.envelope(retry.stdout)["sha"] as? String == cached)
+      let data = try code.envelope(retry.stdout)
+      #expect(data["sha"] as? String == cached)
+      #expect(data["output"] as? String == "README.md:1:Acme console\n")
       #expect(try code.warnings(retry.stdout)["ref_stale"] != nil)
     }
   }
