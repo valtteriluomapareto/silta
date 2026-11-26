@@ -48,7 +48,7 @@ struct BriefDocsTests {
   ) throws -> [BriefSection] {
     try store.read {
       try BriefContext(
-        db: $0, location: location, actor: TaskServiceTests.agent,
+        db: $0, location: BriefLocation(location), actor: TaskServiceTests.agent,
         date: AcmeDocAttachments.instant, archiveDays: 14
       ).sections(topics: topics, compact: compact).sections
     }
@@ -144,7 +144,7 @@ struct BriefDocsTests {
         var statements: [String] = []
         db.trace { if case .statement(let statement) = $0 { statements.append(statement.sql) } }
         let context = try BriefContext(
-          db: db, location: location, actor: TaskServiceTests.agent,
+          db: db, location: BriefLocation(location), actor: TaskServiceTests.agent,
           date: AcmeDocAttachments.instant, archiveDays: 14
         ).sections(topics: [], compact: compact)
         db.trace(nil)

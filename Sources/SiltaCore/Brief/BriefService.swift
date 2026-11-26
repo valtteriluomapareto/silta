@@ -14,8 +14,17 @@ package struct BriefService {
     path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil,
     topics: [String] = [], budget: Int = 2500, short: Bool = false, hook: Bool = false
   ) async throws -> BriefReport {
-    let location = try await LocationService(environment: environment).resolve(
-      path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
+    let service = LocationService(environment: environment)
+    let location: BriefLocation
+    do {
+      location = BriefLocation(
+        try await service.resolve(
+          path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook))
+    } catch LocationError.outsideRepository {
+      guard !hook || workspace != nil else { throw LocationError.outsideRepository }
+      location = try workspaceLocation(
+        workspace: workspace, app: app, task: task, topics: topics, using: service)
+    }
     let now = environment.clock.now()
     var report = try environment.db.read {
       try self.report(
@@ -27,9 +36,30 @@ package struct BriefService {
     return report
   }
 
+  private func workspaceLocation(
+    workspace: String?, app: String?, task: String?, topics: [String],
+    using service: LocationService
+  ) throws -> BriefLocation {
+    let arguments =
+      (task.map { " --task " + shellWord(SecretGuard.redacted($0)) } ?? "")
+      + topics.map { " --topic " + shellWord(SecretGuard.redacted($0)) }.joined()
+    let selected: String
+    do {
+      selected = try WorkspaceSelection.resolve(workspace, in: environment.db)
+    } catch WorkspaceError.notFound {
+      throw try service.outsideGitFailure(briefArguments: arguments)
+    }
+    guard app == nil else {
+      throw CommandFailure(
+        error: TaskError.invalid("Use --app from a repository that contains the app."),
+        next: [workspaceCommand("silta brief" + arguments, workspace: selected)])
+    }
+    return BriefLocation(workspace: selected, task: task)
+  }
+
   /// Captures brief data in the caller's read snapshot before any edge probes.
   func report(
-    _ location: LocationResult, app: String? = nil, topics: [String] = [], budget: Int = 2500,
+    _ location: BriefLocation, app: String? = nil, topics: [String] = [], budget: Int = 2500,
     compact: Bool = false, at now: Date, in db: Database
   ) throws -> BriefReport {
     let command = "silta --ws " + shellWord(location.workspace)
@@ -38,8 +68,13 @@ package struct BriefService {
     let (selectedTopics, topicWarnings) = try topicSelection(topics, workspace: id, in: db)
     let settings = BriefSettings(
       try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
-    var selected = try location.currentTask.map {
-      try TaskService.lookup($0.ref, workspace: location.workspace, in: db)
+    var selected: TaskDetails?
+    do {
+      selected = try location.taskRef.map {
+        try TaskService.lookup($0, workspace: location.workspace, in: db)
+      }
+    } catch let error as any CodedError where error.code == .notFound {
+      throw CommandFailure(error: error, next: [command + " task ls"])
     }
     if let current = selected {
       selected?.waiting = try TaskService.waiting(current, at: now, in: db)
@@ -64,14 +99,15 @@ package struct BriefService {
         ?? [command + " task ls", command + " ws show"])
       + (discussion.inbox.isEmpty ? [] : [command + " inbox"])
     return BriefReport(
-      location: BriefLocation(location), settings: settings,
+      location: location, settings: settings,
       currentTask: selected?.ref,
       sections: sections(
         location, current: selected, topics: selectedTopics,
         discussion: discussion.task, characters: characters)
         + discussion.inbox + context.sections,
       more: more,
-      warnings: location.warnings + settings.warnings + context.warnings + topicWarnings)
+      warnings: (location.git?.warnings ?? []) + settings.warnings + context.warnings
+        + topicWarnings)
   }
 
   private func topicSelection(_ words: [String], workspace: Int64, in db: Database) throws
@@ -117,15 +153,15 @@ package struct BriefService {
   }
 
   private func sections(
-    _ location: LocationResult, current: TaskDetails?, topics: [String],
+    _ location: BriefLocation, current: TaskDetails?, topics: [String],
     discussion: [BriefSection], characters: Int
   )
     -> [BriefSection]
   {
     let command = "silta --ws " + shellWord(location.workspace)
     var sections: [BriefSection] = []
-    if location.confidence == "low" {
-      let candidates = location.retryCandidates
+    if let git = location.git, git.confidence == "low" {
+      let candidates = git.retryCandidates
       if !candidates.isEmpty {
         let line = candidates.map { "\($0.app) (\($0.ref))" }.joined(separator: ", ")
         let retries = candidates.map {

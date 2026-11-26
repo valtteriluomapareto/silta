@@ -41,11 +41,9 @@ struct WallClockHookTests {
 
       let short = try run(["--short"], scratch, scratch)
       let scoped = try run(["--hook"], scratch, scratch)
-      withKnownIssue("SI-264: even an explicitly scoped hook brief requires Git") {
-        #expect(scoped.stdout.hasPrefix("workspace: acme (outside Git)\n"))
-        #expect(scoped.stdout.count <= 3_200)
-        #expect(scoped == short)
-      }
+      #expect(scoped.stdout.hasPrefix("workspace: acme (outside Git)\n"))
+      #expect(scoped.stdout.count <= 3_200)
+      #expect(scoped == short)
       #expect(try brief.hookTimeoutCount(scratch) == 0)
     }
   }

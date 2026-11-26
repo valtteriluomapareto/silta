@@ -18,25 +18,24 @@ struct BriefWorkspaceCommandTests {
         try store.write {
           try $0.database.execute(
             sql: """
-              INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Acme Beta','BE');
+              INSERT INTO workspace(uid,slug,name,task_prefix)
+              VALUES('beta','beta','Acme Beta','BE');
               UPDATE meta SET value='beta' WHERE key='current_workspace';
               """)
         }
       }
       let args = explicit ? ["--ws", "acme"] : []
       let result = try run(args, scratch: scratch)
-      withKnownIssue("SI-264: brief requires Git even when the workspace is selected") {
-        let data = try fixture.fixture.data(result)
-        let location = try #require(data["location"] as? [String: Any])
-        #expect(location["workspace"] as? String == "acme")
-        #expect(location["repo"] as? String == "")
-        #expect(location["app"] is NSNull)
-        #expect(location["branch"] is NSNull)
-        #expect(location["reason"] as? String == "workspace_only")
-        #expect(data["current_task"] == nil)
-        let sections = try #require(data["sections"] as? [[String: String]])
-        #expect(sections.contains { $0["text"]?.hasPrefix("open: AC-2") == true })
-      }
+      let data = try fixture.fixture.data(result)
+      let location = try #require(data["location"] as? [String: Any])
+      #expect(location["workspace"] as? String == "acme")
+      #expect(location["repo"] as? String == "")
+      #expect(location["app"] is NSNull)
+      #expect(location["branch"] is NSNull)
+      #expect(location["reason"] as? String == "workspace_only")
+      #expect(data["current_task"] == nil)
+      let sections = try #require(data["sections"] as? [[String: String]])
+      #expect(sections.contains { $0["text"]?.hasPrefix("open: AC-2") == true })
       #expect(try WorkspaceSelection.resolve(in: store) == (explicit ? "beta" : "acme"))
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/index.db").path)
@@ -55,16 +54,14 @@ struct BriefWorkspaceCommandTests {
       let noSelection = try run(selectors, scratch: scratch)
       let noApp = try run(["--ws", "acme", "--app", "api"] + selectors, scratch: scratch)
       let unknown = try run(["--ws", "missing"], scratch: scratch)
-      withKnownIssue("SI-264: the outside-Git refusal loses workspace choices and selectors") {
-        let missingError = try TaskStateCommandTests.error(noSelection)
-        #expect(noSelection.termination == .exit(2))
-        #expect(missingError["code"] as? String == "unregistered")
-        #expect(missingError["next"] as? [String] == expected)
-        let appError = try TaskStateCommandTests.error(noApp)
-        #expect(noApp.termination == .exit(1))
-        #expect(appError["next"] as? [String] == expected)
-        #expect(try TaskStateCommandTests.error(unknown)["code"] as? String == "not_found")
-      }
+      let missingError = try TaskStateCommandTests.error(noSelection)
+      #expect(noSelection.termination == .exit(2))
+      #expect(missingError["code"] as? String == "unregistered")
+      #expect(missingError["next"] as? [String] == expected)
+      let appError = try TaskStateCommandTests.error(noApp)
+      #expect(noApp.termination == .exit(1))
+      #expect(appError["next"] as? [String] == expected)
+      #expect(try TaskStateCommandTests.error(unknown)["code"] as? String == "not_found")
     }
   }
 
@@ -72,12 +69,10 @@ struct BriefWorkspaceCommandTests {
     try withScratchDirectory { scratch in
       _ = try fixture.contextFixture(scratch)
       let result = try run(["--task", "AC-2", "--topic", "payments"], scratch: scratch)
-      withKnownIssue("SI-264: explicit task and topic require Git") {
-        let data = try fixture.fixture.data(result)
-        #expect(data["current_task"] as? String == "AC-2")
-        let sections = try #require(data["sections"] as? [[String: String]])
-        #expect(sections.contains { $0["text"]?.hasPrefix("open: AC-3") == true })
-      }
+      let data = try fixture.fixture.data(result)
+      #expect(data["current_task"] as? String == "AC-2")
+      let sections = try #require(data["sections"] as? [[String: String]])
+      #expect(sections.contains { $0["text"]?.hasPrefix("open: AC-3") == true })
     }
   }
 
@@ -85,10 +80,8 @@ struct BriefWorkspaceCommandTests {
     try withScratchDirectory { scratch in
       _ = try fixture.fixture.setup(scratch)
       let result = try run([], scratch: scratch)
-      withKnownIssue("SI-264: no workspace-only JSON result") {
-        try #require(result.termination == .exit(0))
-        Golden.forTests().check(result.stdout, "brief-workspace.json")
-      }
+      try #require(result.termination == .exit(0))
+      Golden.forTests().check(result.stdout, "brief-workspace.json")
     }
   }
 

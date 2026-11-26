@@ -505,10 +505,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
   `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
   `distance`, `non_app_ref`, `shallow` or `unresolved`.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
-- Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
-  help, without suggesting a scan of the input directory. An unregistered Git
-  repository gets a scan command for its canonical toplevel. With an explicit
-  existing workspace, the unregistered result points to that workspace's YAML.
+- Outside Git, `where` returns `unregistered`. If workspaces exist it prints
+  scoped `brief` retries, preserving the inspected directory when `--path` was
+  supplied. With no workspaces it points to help. An unregistered Git repository
+  gets a scan command for its canonical toplevel. With an explicit existing
+  workspace, the unregistered result points to that workspace's YAML.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
@@ -1602,6 +1603,15 @@ workspace. A setting that changes the rules gets one conditional sentence, and
 silta brief [--task AC-12] [--app <slug>] [--topic <slug>…] [--budget 2500] [--short] [--hook] [--json]
 ```
 
+Outside Git, `brief` uses an explicit `--ws` or the workspace saved by `ws use`.
+It shows workspace settings, inbox and backlog. `--task` and `--topic` select
+workspace context. `--app` requires a repository candidate. With no workspace
+selection, `brief` gives scoped retry commands when workspaces are available.
+The JSON location has reason `workspace_only`, low app confidence, an empty
+string for `repo` and null `app` and `branch`. The installed SessionStart hook
+stays silent outside Git. An explicit `silta --ws acme brief --hook` can request
+the bounded workspace brief.
+
 The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 `--hook` use about 800. Sections come in this order, each trimmed to fit:
 
@@ -1683,6 +1693,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    aliases. Their matching tasks may belong to other apps; duplicates appear once,
    and topics do not expand recursively. An unknown topic returns `not_found` with
    a workspace-qualified `ws show` command. The current task may also appear here.
+   A workspace-only brief includes tasks across the workspace, filtered by
+   `--topic` when supplied.
 7. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
    matching tasks, ordered by completion instant then task sequence descending.
    Empty result text is omitted. Cross-app open rows name their app.
