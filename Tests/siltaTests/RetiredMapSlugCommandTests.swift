@@ -129,6 +129,61 @@ struct RetiredMapSlugCommandTests {
     }
   }
 
+}
+
+extension RetiredMapSlugCommandTests {
+  @Test func staleReleaseCannotClearAReplacementIdentitysReservation() throws {
+    try withScratchDirectory { scratch in
+      let store = BriefCommandTests().store(scratch)
+      try AcmeDocAttachments.apply(original, to: store)
+      try saved(withoutAPI, scratch)
+      let initial = try show(scratch)
+      let release = "released: {apps: [api]}\n"
+      let stale = initial + release
+      let task = try run(["task", "add", "Unrelated Acme work", "--app", "none"], scratch)
+      try #require(task.termination == .exit(0), "\(task.stdout)\(task.stderr)")
+      #expect(try show(scratch) == initial)
+      let reuse = withoutAPI.replacingOccurrences(
+        of: "apps: []", with: "apps: [{slug: api, repo: platform, ref: main}]")
+      try saved(stamp(initial) + reuse + release, scratch)
+      try saved(withoutAPI, scratch)
+      let replacement = try show(scratch)
+      #expect(
+        replacement.split(separator: "\n").dropFirst() == initial.split(separator: "\n").dropFirst()
+      )
+      #expect(replacement != initial)
+      let count = try approvals(store)
+      for preview in [true, false] {
+        let result = try edit(stale, scratch, preview: preview)
+        #expect(result.termination == .exit(6), "\(result.stdout)\(result.stderr)")
+        #expect(
+          try TaskStateCommandTests.error(result)["next"] as? [String] == [
+            "silta --ws 'acme' ws show"
+          ])
+      }
+      #expect(try show(scratch) == replacement)
+      #expect(try approvals(store) == count)
+    }
+  }
+
+  @Test func releaseWarnsAboutOldReferencesInBothOutputModes() throws {
+    try withScratchDirectory { scratch in
+      let store = BriefCommandTests().store(scratch)
+      try AcmeDocAttachments.apply(original, to: store)
+      try saved(withoutAPI, scratch)
+      let draft = try show(scratch) + "released: {apps: [api]}\n"
+      let warning = "Released references may resolve to a new identity when reused."
+      let text = try edit(draft, scratch, preview: true, json: false)
+      #expect(text.termination == .exit(0) && text.stderr.contains(warning))
+      for preview in [true, false] {
+        let result = try edit(draft, scratch, preview: preview)
+        try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+        #expect(try TaskStateCommandTests.warnings(result).contains("released_map_slug"))
+        #expect(result.stdout.contains(warning))
+      }
+    }
+  }
+
   @Test func aliasPreviewTracksAnOwnerMoveAndIgnoresCaseOnlyChanges() throws {
     try withScratchDirectory { scratch in
       let store = BriefCommandTests().store(scratch)
@@ -149,6 +204,25 @@ struct RetiredMapSlugCommandTests {
       let unchanged = try edit(caseOnly, scratch, preview: true)
       #expect(!unchanged.stdout.contains("aliases_changed"))
       #expect(try show(scratch) == shown)
+    }
+  }
+
+  @Test func previewShowsNormalizationOfALegacyStoredAlias() throws {
+    try withScratchDirectory { scratch in
+      let store = BriefCommandTests().store(scratch)
+      try AcmeDocAttachments.apply(original, to: store)
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE topic_alias SET alias='MESSAGES' WHERE alias='messages'")
+      }
+      let preview = try changes(original, scratch)
+      let aliases = try #require(preview["aliases_changed"] as? [[String: Any]])
+      #expect(aliases.count == 1)
+      #expect(aliases.first?["topic"] as? String == "topic:api")
+      #expect(aliases.first?["removed"] as? [String] == ["MESSAGES"])
+      #expect(aliases.first?["added"] as? [String] == ["messages"])
+      try saved(original, scratch)
+      #expect(try changes(original, scratch)["aliases_changed"] == nil)
     }
   }
 
@@ -216,11 +290,17 @@ struct RetiredMapSlugCommandTests {
     return try #require((try TaskStateCommandTests.data(preview))["changes"] as? [String: Any])
   }
 
-  private func edit(_ yaml: String, _ scratch: URL, preview: Bool = false) throws -> CLIResult {
+  private func approvals(_ store: DatabaseStore) throws -> Int? {
+    try store.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM approval") }
+  }
+
+  private func edit(_ yaml: String, _ scratch: URL, preview: Bool = false, json: Bool = true)
+    throws -> CLIResult
+  {
     let file = scratch.appending(path: "workspace.yml")
     try yaml.write(to: file, atomically: true, encoding: .utf8)
     let mode = preview ? ["--dry-run"] : ["--approved", "Apply the Acme workspace edit."]
-    return try run(["ws", "edit", "-F", file.path, "--json"] + mode, scratch)
+    return try run(["ws", "edit", "-F", file.path] + (json ? ["--json"] : []) + mode, scratch)
   }
 
   private func saved(_ yaml: String, _ scratch: URL) throws {

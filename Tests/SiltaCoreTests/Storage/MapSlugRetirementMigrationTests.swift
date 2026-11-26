@@ -34,7 +34,8 @@ struct MapSlugRetirementMigrationTests {
           #expect(after == before)
         } else {
           #expect(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
-          #expect(after != before)
+          #expect(before.contains("app|api") && !after.contains("app|api"))
+          #expect(after.contains(#"{"_retired_map_slugs":{"app":["historical"]}}"#))
         }
       }
     }

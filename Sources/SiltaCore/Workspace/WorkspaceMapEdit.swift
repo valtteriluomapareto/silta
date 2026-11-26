@@ -76,8 +76,8 @@ struct WorkspaceMapEdit {
     try checkAdditions(additions)
     let removedIDs = Dictionary(grouping: removals, by: \.table).mapValues { Set($0.map(\.id)) }
     let newlyRetired = typedSlugs(
-      apps.retired.filter { !(retired["app"] ?? []).contains($0) },
-      topics.retired.filter { !(retired["topic"] ?? []).contains($0) })
+      Array(Set(apps.retired).subtracting(retired["app"] ?? [])),
+      Array(Set(topics.retired).subtracting(retired["topic"] ?? [])))
     let released = typedSlugs(config.released(.app), config.released(.topic))
     let aliases = try aliasChanges(config.rows("topics"), plan: topics, workspace: id, in: db)
     let changes = WorkspaceMapChanges(
@@ -105,9 +105,12 @@ struct WorkspaceMapEdit {
         "\(kind.rawValue.capitalized) slug \(TaskError.shown(unknown)) is not already retired."
       ])
     }
+    let stored = try WorkspaceSlugs.read(kind, workspace: workspace, in: db)
+    if !released.isEmpty {
+      _ = try WorkspaceSlugs.ownership(kind, items: stored, retired: names.sorted())
+    }
     return try WorkspaceSlugs.plan(
-      kind, rows: config.rows(kind.section),
-      stored: WorkspaceSlugs.read(kind, workspace: workspace, in: db),
+      kind, rows: config.rows(kind.section), stored: stored,
       retired: names.subtracting(released).sorted())
   }
 
@@ -156,19 +159,19 @@ struct WorkspaceMapEdit {
     let stored = try Row.fetchAll(
       db,
       sql: """
-        SELECT topic.id, topic.slug, topic_alias.alias FROM topic_alias
+        SELECT topic.id, topic.slug, CAST(topic_alias.alias AS BLOB) AS alias FROM topic_alias
         JOIN topic ON topic.id=topic_alias.topic_id
         WHERE topic_alias.workspace_id=? AND topic.workspace_id=?
         """, arguments: [workspace, workspace])
-    let before = stored.reduce(into: [String: Set<String>]()) { result, row in
+    let before = stored.reduce(into: [String: Set<Data>]()) { result, row in
       let slug = currentSlugs[row["id"]] ?? (row["slug"] as String)
-      result[slug, default: []].insert(WorkspaceConfig.normalize(row["alias"]))
+      result[slug, default: []].insert(row["alias"])
     }
     let after = Dictionary(
       uniqueKeysWithValues: rows.map { row in
         let normalized = (row["aliases"]?.array(of: String.self) ?? []).map(
           WorkspaceConfig.normalize)
-        return (row["slug"]?.string ?? "", Set(normalized))
+        return (row["slug"]?.string ?? "", Set(normalized.map { Data($0.utf8) }))
       })
     return Set(before.keys).union(after.keys).sorted().compactMap { slug in
       let old = before[slug] ?? []
@@ -176,8 +179,13 @@ struct WorkspaceMapEdit {
       guard old != new else { return nil }
       return WorkspaceMapChanges.AliasChange(
         topic: "topic:" + TaskError.shown(slug),
-        added: new.subtracting(old).sorted().map(TaskError.shown),
-        removed: old.subtracting(new).sorted().map(TaskError.shown))
+        added: displayAliases(new.subtracting(old)), removed: displayAliases(old.subtracting(new)))
+    }
+  }
+
+  private static func displayAliases(_ aliases: Set<Data>) -> [String] {
+    aliases.sorted { $0.lexicographicallyPrecedes($1) }.map {
+      TaskError.shown(String(bytes: $0, encoding: .utf8) ?? "<invalid UTF-8>")
     }
   }
 

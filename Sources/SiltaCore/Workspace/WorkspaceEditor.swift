@@ -220,8 +220,15 @@ package enum WorkspaceEditor {
         arguments: [id])
     }
     let stored = settings ?? "{}"
-    guard identity.contains(where: { !$0.isEmpty }) || stored.contains(WorkspaceSlugs.retiredKey)
-    else { return "" }
+    if stored.contains(WorkspaceSlugs.retiredKey) {
+      // The same name can retire again after release and reuse. A new edit invalidates old drafts.
+      let revision =
+        try Int64.fetchOne(
+          db, sql: "SELECT MAX(seq) FROM change_log WHERE kind='workspace' AND row_id=?",
+          arguments: [id]) ?? 0
+      return try WorkspaceConfig.json([stored, identity, revision] as [Any])
+    }
+    guard identity.contains(where: { !$0.isEmpty }) else { return "" }
     return try WorkspaceConfig.json([stored, identity] as [Any])
   }
 

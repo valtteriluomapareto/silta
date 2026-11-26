@@ -3135,10 +3135,12 @@ cannot be recovered from the database.
 `released: {apps: [old-api], topics: [old-topic]}` to a fresh `ws show` file and keep
 its baseline comment. The interactive editor uses its captured baseline. The release
 is scoped by app or topic, can be combined with reuse in the same edit, and needs
-the ordinary human approval for `ws edit`. A released ref may resolve to a different
+the ordinary human approval for `ws edit`. A newer workspace edit invalidates the
+release draft even if it returns the map to the same visible state. The
+`released_map_slug` warning explains that a released ref may resolve to a different
 identity after reuse. Releases are one-time requests and never appear in the saved YAML.
 `ws edit --dry-run` reports typed `retired` and `released` names and `aliases_changed`
-entries, each with a topic ref and its added and removed normalized aliases. It omits
+entries, each with a topic ref, normalized additions and exact stored removals. It omits
 these optional fields when they are empty. Use the preview before requesting approval.
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
