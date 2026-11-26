@@ -69,6 +69,30 @@ struct WhereOutputTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func outsideGitRetryKeepsSafeInspectedPaths(unsafe: Bool) throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      let outside = scratch.appending(path: unsafe ? "Other\nplace" : "Acme's workspace")
+      try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+      let result = try fixture.run(["--path", outside.path], repo, scratch)
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require(error["next"] as? [String])
+      if unsafe {
+        #expect(next == ["silta ws ls"])
+        #expect(!result.stdout.contains("Other\\nplace"))
+      } else {
+        let command = try #require(next.first)
+        let path = try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
+        let returned = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-ec", command], in: scratch, cwd: repo,
+          environment: ["PATH": path])
+        #expect(returned.termination == .exit(0), "\(returned.stdout)\(returned.stderr)")
+        #expect(returned.stdout.hasPrefix("workspace: acme (outside Git)\n"))
+      }
+    }
+  }
+
   @Test func unmatchedRepositoryInExistingWorkspaceHasAnActionableNext() throws {
     try withScratchDirectory { scratch in
       _ = try fixture.setup(scratch)

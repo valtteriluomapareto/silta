@@ -54,6 +54,7 @@ struct BriefWorkspaceCommandTests {
       let noSelection = try run(selectors, scratch: scratch)
       let noApp = try run(["--ws", "acme", "--app", "api"] + selectors, scratch: scratch)
       let unknown = try run(["--ws", "missing"], scratch: scratch)
+      let unsafe = try run(["--topic", "Acme\nunsafe"], scratch: scratch)
       let missingError = try TaskStateCommandTests.error(noSelection)
       #expect(noSelection.termination == .exit(2))
       #expect(missingError["code"] as? String == "unregistered")
@@ -62,6 +63,7 @@ struct BriefWorkspaceCommandTests {
       #expect(noApp.termination == .exit(1))
       #expect(appError["next"] as? [String] == expected)
       #expect(try TaskStateCommandTests.error(unknown)["code"] as? String == "not_found")
+      #expect(try TaskStateCommandTests.error(unsafe)["next"] as? [String] == ["silta ws ls"])
     }
   }
 
@@ -82,6 +84,23 @@ struct BriefWorkspaceCommandTests {
       let result = try run([], scratch: scratch)
       try #require(result.termination == .exit(0))
       Golden.forTests().check(result.stdout, "brief-workspace.json")
+    }
+  }
+
+  @Test func workspaceBacklogOverflowHasAScopedContinuation() throws {
+    try withScratchDirectory { scratch in
+      _ = try fixture.fixture.setup(scratch)
+      try fixture.store(scratch).write {
+        try $0.database.execute(
+          sql: """
+            WITH RECURSIVE seq(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM seq WHERE n<10)
+            INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+            SELECT 'acme-'||n,1,n,'Acme backlog','todo','human:acme','','' FROM seq
+            """)
+      }
+      let result = try fixture.run(["--task", "AC-1"], scratch, scratch)
+      #expect(result.termination == .exit(0), "\(result.stderr)")
+      #expect(result.stdout.contains("2 more open:\nnext: silta --ws 'acme' task ls\n"))
     }
   }
 

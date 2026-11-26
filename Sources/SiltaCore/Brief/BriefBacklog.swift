@@ -157,6 +157,7 @@ struct BriefBacklog {
 
   private func listCommands(rows: [Row]) -> [String] {
     let command = "silta --ws " + shellWord(location.workspace) + " task ls"
+    if location.git == nil, rows.isEmpty { return [command] }
     var commands = location.app.map { [command + " --app " + shellWord($0)] } ?? []
     let slugs = rows.map { $0["slug"] as String }
     for slug in Set(slugs).sorted() { commands.append(command + " --topic " + shellWord(slug)) }

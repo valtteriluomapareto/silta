@@ -40,9 +40,12 @@ package struct BriefService {
     workspace: String?, app: String?, task: String?, topics: [String],
     using service: LocationService
   ) throws -> BriefLocation {
-    let arguments =
-      (task.map { " --task " + shellWord(SecretGuard.redacted($0)) } ?? "")
-      + topics.map { " --topic " + shellWord(SecretGuard.redacted($0)) }.joined()
+    let selectors = (task.map { [$0] } ?? []) + topics
+    let arguments: String? =
+      selectors.allSatisfy(RestoreService.canNameInRecovery)
+      ? (task.map { " --task " + shellWord($0) } ?? "")
+        + topics.map { " --topic " + shellWord($0) }.joined()
+      : nil
     let selected: String
     do {
       selected = try WorkspaceSelection.resolve(workspace, in: environment.db)
@@ -50,9 +53,13 @@ package struct BriefService {
       throw try service.outsideGitFailure(briefArguments: arguments)
     }
     guard app == nil else {
+      let next =
+        RestoreService.canNameInRecovery(selected)
+        ? workspaceCommand("silta brief" + (arguments ?? " --help"), workspace: selected)
+        : "silta ws ls"
       throw CommandFailure(
         error: TaskError.invalid("Use --app from a repository that contains the app."),
-        next: [workspaceCommand("silta brief" + arguments, workspace: selected)])
+        next: [next])
     }
     return BriefLocation(workspace: selected, task: task)
   }
