@@ -23,7 +23,8 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   - §17: the change signal, `data_version`, `App/SiltaApp.xcodeproj`;
   - §19: logs come from the CLI front-end.
 - [`workspace-knowledge.md`](workspace-knowledge.md) supplies docs and proposals.
-  Doc triage arrives with SI-134; diff readability with SI-126.
+  Doc triage (SI-134) is decided in the app from My work and the Docs Changes tab;
+  diff readability came with SI-126.
 
 ## Scope
 
@@ -85,8 +86,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
     `REFS`, and question answers use `-m ""`, which Silta refuses as an empty body;
   - review items offer task-reading commands. Human completion permits an empty
     result, so a completion template cannot promise the same empty-message refusal.
-    The maintainer chose to preserve CLI behavior on 2026-11-17; completion commands
-    remain outside this viewer;
+    The maintainer chose to preserve CLI behavior on 2026-11-17. On 2026-11-21 they
+    chose review actions in the app instead (Paper "App features v1"): a review card
+    marks the task done only with a nonblank result and an optional merge commit
+    (`app done`), requests changes as a question to the submitter, or drops it;
   - a Copied state;
   - ⌘C and a context menu.
   - Paper "App features v1": Board cards, done rows, review rows and Claimed now rows
@@ -180,6 +183,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   still share one, and the human then chooses from the sidebar app menu or the map's app
   inspector. The choice is stored only on this Mac, by workspace and slug, so a renamed
   app falls back to automatic; fixture runs store nothing.
+- **App names:** where the app names an app or a connection's end to the human (sidebar,
+  board, New Task, menus, inspectors, My work, Workspace and Docs), it shows the map's
+  display name and falls back to the slug. Filters, `app:` refs, picker tags and help
+  keep the slug.
 - **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
   light and dark layers in tide. Its design, geometry and regeneration steps are in
   [`app-icon.md`](../app-icon.md).
@@ -193,7 +200,7 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
 | A2 (SI-145) | Running Debug app: sidebar, My work, copyable refs/commands, isolated fixture launch, store states and refresh; folds SI-175, SI-176 and A2c into one screen PR. SI-173 commands can land separately | A1a, A1b | Native view-model tests, Debug/Release builds, state and PNG checks; unlocked interaction follow-up |
 | A3 | Board and task inspector | A2 | View-model tests on the seed, state and PNG checks; unlocked interaction follow-up |
 | A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed, state and PNG checks; unlocked interaction follow-up |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block (Accept and Reject buttons once the app writes) | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
 | A6a (SI-196) | Sea glass restyle of the shell and all four screens (MVP v3) | A5 | View-model tests for header and chrome values; light and dark PNG checks of every screen; pending unlocked check of glass, Reduce Transparency and Increase Contrast |
 | A6b (SI-197) | Workspace map: a pure, tested layout in `SiltaAppSupport` (columns, order, back edges, arrow-key neighbours) and a Map/List view with app, service and connection selection, an app/service inspector, Esc to clear, and a fit-to-pane zoom between 60% and 100% (no manual zoom yet) | A6a | Layout tests on the Acme seed, a 12-app map and cycles; geometry, map-content and selection tests; PNG checks of app, service and connection selection |
 

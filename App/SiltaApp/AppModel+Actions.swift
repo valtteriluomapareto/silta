@@ -29,7 +29,10 @@ extension AppModel {
       }
       await refresh(force: true).value
       await loadTaskDetail()
-      if visibleData != nil { actions.selectedProposals.formIntersection(proposalRefs) }
+      if visibleData != nil {
+        actions.selectedProposals.formIntersection(proposalRefs)
+        actions.selectedDocuments.formIntersection(documentRefs)
+      }
       actions.finish(target, failure: failure)
       return result
     }
@@ -73,6 +76,31 @@ extension AppModel {
   /// The drop reason's draft, apart from the proposals' shared write target.
   static let dropReasonTarget = "drop-reason"
 
+  /// The document revision proposals My work lists, which a selection may name.
+  var documentRefs: Set<String> {
+    let items = allWaiting ?? visibleData?.snapshot?.work.items ?? []
+    return Set(items.filter { $0.kind == "doc_proposal" }.flatMap(\.refs))
+  }
+
+  /// Accepts or rejects the ticked revisions among `visible` as one all-or-nothing triage.
+  @discardableResult func triageSelectedDocuments(accept: Bool, among visible: [String])
+    -> Task<Void, Never>?
+  {
+    let refs = actions.selectedDocuments.intersection(documentRefs).intersection(visible).sorted()
+    guard !refs.isEmpty else { return nil }
+    return triageDocuments(accept: accept ? refs : [], reject: accept ? [] : refs)
+  }
+
+  /// Accepts and rejects document revisions under the one target all document triage
+  /// shares, so only one batch runs at a time.
+  @discardableResult func triageDocuments(accept: [String], reject: [String])
+    -> Task<Void, Never>?
+  {
+    perform(.triageDocuments(accept: accept, reject: reject), for: Self.documentsTarget)
+  }
+
+  static let documentsTarget = "documents"
+
   /// Unblocks a ready task under its own target, apart from the task's comment draft.
   @discardableResult func unblock(_ ref: String) -> Task<Void, Never>? {
     perform(.unblock(ref: ref), for: Self.unblockTarget(ref))
@@ -105,6 +133,42 @@ extension AppModel {
       actions.setDraft("", for: reasonTarget)
     }
   }
+
+  /// Marks a reviewed task done with its result draft and optional merge commit draft;
+  /// both clear only on success. A blank result sends nothing.
+  @discardableResult func markDone(_ ref: String) -> Task<Void, Never>? {
+    guard let resultTarget = target(Self.doneResultTarget(ref)),
+      let shaTarget = target(Self.doneSHATarget(ref))
+    else { return nil }
+    let result = actions.draft(resultTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    let sha = actions.draft(shaTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !result.isEmpty,
+      let running = perform(
+        .markDone(ref: ref, result: result, sha: sha.isEmpty ? nil : sha),
+        for: Self.followUpTarget(ref))
+    else { return nil }
+    return Task {
+      await running.value
+      guard let task = target(Self.followUpTarget(ref)), actions.failures[task] == nil
+      else { return }
+      actions.setDraft("", for: resultTarget)
+      actions.setDraft("", for: shaTarget)
+    }
+  }
+
+  /// Sends the changes draft as a question to the submitter, so it waits in that
+  /// session's inbox and brief until it answers.
+  @discardableResult func requestChanges(_ ref: String, from submitter: String)
+    -> Task<Void, Never>?
+  {
+    send(draftOf: Self.changesTarget(ref)) {
+      .comment(task: ref, body: $0, kind: CommentKind.question.rawValue, to: [submitter])
+    }
+  }
+
+  static func doneResultTarget(_ ref: String) -> String { "done-result:" + ref }
+  static func doneSHATarget(_ ref: String) -> String { "done-sha:" + ref }
+  static func changesTarget(_ ref: String) -> String { "changes:" + ref }
 
   /// One write at a time per blocked task: snooze, unblock anyway or drop.
   static func followUpTarget(_ ref: String) -> String { "followup:" + ref }

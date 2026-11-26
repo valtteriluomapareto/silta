@@ -17,7 +17,7 @@
         await model.refresh(force: true).value
         let snapshot = try #require(model.visibleData?.snapshot)
         let badge = snapshot.work.waitingCount
-        let capped = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+        let capped = MyWorkContent(snapshot: snapshot, apps: [], search: "", now: AppV2Fixture.now)
         #expect(capped.remaining > 0)
         #expect(
           MyWorkContent.footer(remaining: capped.remaining, showingAll: false)
@@ -26,7 +26,7 @@
         await model.showAllWaiting().value
         #expect(model.showingAllWaiting)
         let all = MyWorkContent(
-          snapshot: snapshot, all: model.allWaiting, search: "", now: AppV2Fixture.now)
+          snapshot: snapshot, all: model.allWaiting, apps: [], search: "", now: AppV2Fixture.now)
         #expect(all.remaining == 0)
         #expect(all.questions.count == 14 && capped.questions.count < 14)
         let allItems = try #require(model.allWaiting)
@@ -65,7 +65,7 @@
         let all = try #require(model.allWaiting)
         #expect(model.proposalRefs == ["AC-21", "AC-22", "AC-23"])
         let searched = MyWorkContent(
-          snapshot: try #require(model.visibleData?.snapshot), all: all, search: "AC-21",
+          snapshot: try #require(model.visibleData?.snapshot), all: all, apps: [], search: "AC-21",
           now: AppV2Fixture.now)
         #expect(searched.tasks.map(\.ref) == ["AC-21"])
         model.actions.selectedProposals = ["AC-21", "AC-23"]

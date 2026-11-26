@@ -102,6 +102,42 @@ extension MyWorkView {
     }.padding(.leading, 32).padding(.top, 4)
   }
 
+  func documentSelection(_ ref: String) -> Binding<Bool> {
+    Binding(
+      get: { model.actions.selectedDocuments.contains(ref) },
+      set: { selected in
+        if selected {
+          model.actions.selectedDocuments.insert(ref)
+        } else {
+          model.actions.selectedDocuments.remove(ref)
+        }
+      })
+  }
+
+  /// Accept N and Reject N for the ticked revisions, sent as one triage each.
+  func documentFooter(_ rows: [MyWorkContent.Proposal]) -> some View {
+    let visible = rows.map(\.ref)
+    let chosen = visible.filter { model.actions.selectedDocuments.contains($0) }.count
+    let target = model.target(AppModel.documentsTarget)
+    let sending = target.map { model.actions.isSending($0) } ?? false
+    return VStack(alignment: .leading, spacing: 10) {
+      if let failure = target.flatMap({ model.actions.failures[$0] }) {
+        ActionFailureView(failure: failure)
+      }
+      HStack(spacing: 12) {
+        Text("\(chosen) of \(rows.count) selected · accepted revisions become current")
+          .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+          .frame(maxWidth: .infinity, alignment: .leading)
+        Button(chosen == 0 ? "Reject" : "Reject \(chosen)") {
+          model.triageSelectedDocuments(accept: false, among: visible)
+        }.buttonStyle(CompactActionStyle()).disabled(chosen == 0 || sending)
+        Button(sending ? "Sending…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
+          model.triageSelectedDocuments(accept: true, among: visible)
+        }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
+      }
+    }.padding(.leading, 32).padding(.top, 4)
+  }
+
   func unblockRow(_ ref: String) -> some View {
     let target = model.target(AppModel.unblockTarget(ref))
     let sending = target.map { model.actions.isSending($0) } ?? false

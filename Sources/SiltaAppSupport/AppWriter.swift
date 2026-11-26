@@ -33,8 +33,26 @@ public struct AppWriter: Sendable {
   /// Runs any write, including those that close a task, which Core runs asynchronously.
   @discardableResult
   public func send(_ write: AppWrite, workspace: String) async throws -> String? {
-    guard case .dropTask(let ref, let why) = write else {
-      return try perform(write, workspace: workspace)
+    if case .triageDocuments(let accept, let reject) = write {
+      return try await logged(write, workspace: workspace) {
+        let environment = environment()
+        try environment.db.initialize()
+        let service = DocTriageService(environment: environment, workspace: workspace)
+        let batch = DocTriage(accept: accept, reject: reject)
+        _ = try service.authorize(batch)
+        _ = try await service.triage(batch)
+      }
+    }
+    let close: Close
+    switch write {
+    case .dropTask(let ref, let why):
+      close = Close(ref: ref, result: why, dropped: true, commit: TaskCommit())
+    case .markDone(let ref, let result, let sha):
+      var commit = TaskCommit()
+      commit.sha = sha
+      commit.noSHA = sha == nil
+      close = Close(ref: ref, result: result, dropped: false, commit: commit)
+    default: return try perform(write, workspace: workspace)
     }
     let started = base.clock.now()
     var failure: ErrorCode?
@@ -42,8 +60,12 @@ public struct AppWriter: Sendable {
     do {
       do {
         let service = try openService(workspace)
+        // A merge commit is checked in the recorded worktree, else in the app's registered
+        // clone, as `task done` run from the main checkout would.
+        let clone = close.commit.sha == nil ? nil : try service.show(close.ref).repoPath
         _ = try await service.close(
-          ref, result: why, dropped: true, directory: base.home.url)
+          close.ref, result: close.result, dropped: close.dropped, commit: close.commit,
+          directory: clone.map { URL(filePath: $0, directoryHint: .isDirectory) } ?? base.home.url)
         return nil
       } catch {
         throw AppReadError(error).scoped(to: base.home.url)
@@ -52,6 +74,34 @@ public struct AppWriter: Sendable {
       failure = error.code
       throw error
     }
+  }
+
+  /// Runs an asynchronous write with one body-free log line and the viewer's error mapping.
+  private func logged(_ write: AppWrite, workspace: String, _ body: () async throws -> Void)
+    async throws -> String?
+  {
+    let started = base.clock.now()
+    var failure: ErrorCode?
+    defer { log(write, workspace: workspace, started: started, failure: failure) }
+    do {
+      do {
+        try await body()
+        return nil
+      } catch {
+        throw AppReadError(error).scoped(to: base.home.url)
+      }
+    } catch let error as AppReadError {
+      failure = error.code
+      throw error
+    }
+  }
+
+  /// A write that closes a task through Core's asynchronous close.
+  private struct Close {
+    let ref: String
+    let result: String?
+    let dropped: Bool
+    let commit: TaskCommit
   }
 
   /// Opens the existing store first, so store refusals win over the service's workspace
@@ -68,7 +118,7 @@ public struct AppWriter: Sendable {
       try discuss(write, service: service)
     case .acceptProposals, .dropProposals, .unblock, .unblockAnyway, .snooze:
       try organize(write, service: service)
-    case .dropTask:
+    case .dropTask, .markDone, .triageDocuments:
       throw StorageError.internalMisuse
     case .createTask(let task):
       var draft = TaskDraft(title: task.title)

@@ -39,6 +39,8 @@ nonisolated enum TaskMenu {
     let workspace: String
     /// The workspace's display name, for the agent prompt.
     let name: String
+    /// The workspace map's apps, whose display names the app items show.
+    let apps: [AppMapApp]
     /// Recorded worktrees found on this Mac, checked off the main thread at load.
     let existing: Set<String>
     let now: Date
@@ -67,7 +69,7 @@ nonisolated enum TaskMenu {
         availability: .available(
           .copy(reader.readCommand(task: task.ref, workspace: workspace).text))))
     if let slug = task.app {
-      var app = Self.items(forApp: slug)
+      var app = Self.items(forApp: slug, in: context.apps)
       app[0].separatorBefore = true
       items += app
     }
@@ -76,10 +78,12 @@ nonisolated enum TaskMenu {
     return items
   }
 
-  static func items(forApp slug: String) -> [Item] {
-    [
-      Item(title: "Filter Board to " + slug, availability: .available(.filterBoard(slug))),
-      Item(title: "Show Docs About " + slug, availability: .available(.showDocs("app:" + slug))),
+  /// An app's items, titled with its display name and acting on its slug.
+  static func items(forApp slug: String, in apps: [AppMapApp]) -> [Item] {
+    let name = apps.name(of: slug)
+    return [
+      Item(title: "Filter Board to " + name, availability: .available(.filterBoard(slug))),
+      Item(title: "Show Docs About " + name, availability: .available(.showDocs("app:" + slug))),
     ]
   }
 

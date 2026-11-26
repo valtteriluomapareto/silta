@@ -89,6 +89,20 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     parent creates a todo task as the human in one Core write (`app add`); the app never
     starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
     it to an agent (Paper "App features v1"); the app launches nothing (D4).
+  - **Doc proposals:** My work's rows have checkboxes, none ticked at first, with "Reject
+    N" and "Accept N"; the Docs Changes tab has "Reject @N" and "Accept @N" for the open
+    revision. A row triages the newest proposed revision of its document. The selection
+    is pruned after each write and cleared on a workspace switch, and follows the whole
+    inbox while Show all is on. No confirm step, as for task proposals.
+  - **My work review card:** Open task, the PR link, and Mark done / Request changes /
+    Drop. Mark done needs a nonblank result; an empty merge commit records none
+    (`--no-sha`), and a typed one is checked in the worktree or else the app's registered
+    clone. An unmet review gate shows the `task done --force` command to run in a
+    terminal, since the app passes no `--force`; its `RESULT_FILE` and `MERGE_SHA`
+    placeholders refuse until filled, because a human's completion allows an empty result. Request changes posts a question to the
+    submitting agent session. Drafts clear only on success, and ⌘↩ sends only from a
+    focused field. The app doesn't post on or close a linked GitHub issue, which
+    `scripts/dogfood-finish.sh` does.
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
     newest such question. Paper "App features v1": a new thread is a Comment, a
@@ -126,7 +140,13 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, approve and done, archive, editing plans, and `--allow-secret`. Dropping
+- Archive, editing plans, and `--allow-secret`. Doc triage moved in with Paper "App
+  features v1": My work's doc proposals have checkboxes with "Reject N" and "Accept N",
+  and the Docs Changes tab has "Reject @N" and "Accept @N" for the open revision. Each
+  sends one all-or-nothing Core triage as the human (`app doc-triage`). Approving a review moved in
+  on 2026-11-21: My work's review card offers Mark done (a nonblank result, an optional
+  merge commit, no `--force` past an unmet review gate), Request changes (a question to
+  the submitter) and Drop, plus Open task and the PR link. Dropping
   proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
   N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
   and each proposal row has "Open", which opens it in the Board inspector.

@@ -144,8 +144,7 @@ struct WorkspaceList: View {
             ForEach(row.uses, id: \.attachment) { edge in
               connectionButton(
                 edge,
-                name: map.services.first { $0.key == edge.target }?.name
-                  ?? String(edge.target.dropFirst("service:".count))
+                name: map.endpointName(edge.target)
               )
               .padding(.horizontal, 8).padding(.vertical, 3)
               .overlay(
@@ -170,7 +169,7 @@ struct WorkspaceList: View {
       ForEach(edges, id: \.attachment) { edge in
         HStack(spacing: 6) {
           RoundedRectangle(cornerRadius: 2).fill(appColor(app(edge))).frame(width: 7, height: 7)
-          connectionButton(edge, name: app(edge))
+          connectionButton(edge, name: map.endpointName(app(edge)))
         }
       }
     }.fixedSize()
@@ -196,7 +195,9 @@ struct WorkspaceList: View {
       }.foregroundStyle(Color(selected ? "TideText" : "Ink")).contentShape(.rect)
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(edge.source) calls \(edge.target) over \(label)")
+    .accessibilityLabel(
+      "\(map.endpointName(edge.source)) calls \(map.endpointName(edge.target)) over \(label)"
+    )
     .accessibilityAddTraits(selected ? .isSelected : [])
     .help(edge.summary.isEmpty ? edge.attachment : edge.summary)
   }
@@ -254,7 +255,7 @@ struct WorkspaceList: View {
         ForEach(row.users, id: \.attachment) { edge in
           HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 2).fill(appColor(edge.source)).frame(width: 7, height: 7)
-            connectionButton(edge, name: edge.source)
+            connectionButton(edge, name: map.endpointName(edge.source))
           }
           .padding(.horizontal, 8).padding(.vertical, 3)
           .background(Color("Card").opacity(0.7), in: .rect(cornerRadius: 8))

@@ -17,7 +17,7 @@ nonisolated struct BoardFilter: Equatable {
   /// The toolbar label: "Filter", the chosen app, or "Filtered", with the narrowing count
   /// when more than the app narrows the board.
   func title(apps: [AppMapApp]) -> String {
-    let name = app.map { slug in apps.first { $0.slug == slug }?.name ?? slug }
+    let name = app.map(apps.name(of:))
     switch (name, narrowingCount) {
     case (nil, 0): return "Filter"
     case (let name?, 1): return name
@@ -106,7 +106,7 @@ nonisolated struct BoardContent {
   {
     guard let slug else { return nil }
     return AppLabel(
-      name: apps.first { $0.slug == slug }?.name ?? slug,
+      name: apps.name(of: slug),
       color: SidebarContent.appColor(slug: slug, apps: apps, chosen: colours))
   }
 

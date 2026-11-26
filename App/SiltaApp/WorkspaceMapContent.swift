@@ -134,19 +134,20 @@ nonisolated struct WorkspaceMapContent {
   /// VoiceOver text for a node: what it is and every connection it takes part in.
   func description(_ node: AppMapLayout.Node) -> String {
     let outgoing = map.connections.filter { $0.source == node.key }.map {
-      "calls \($0.target) over \($0.kind)"
+      "calls \(map.endpointName($0.target)) over \($0.kind)"
     }
     let incoming = map.connections.filter { $0.target == node.key }.map {
-      "called by \($0.source) over \($0.kind)"
+      "called by \(map.endpointName($0.source)) over \($0.kind)"
     }
-    return ([node.key, node.isService ? "service" : "app"] + outgoing + incoming)
+    return ([map.endpointName(node.key), node.isService ? "service" : "app"] + outgoing + incoming)
       .joined(separator: ", ")
   }
 
   /// VoiceOver text for a connection label.
   func description(_ edge: Edge, docs: String?) -> String {
     let count = docs.map { $0 == "1" ? "1 doc" : "\($0) docs" } ?? "docs not loaded"
-    return "\(edge.connection.source) calls \(edge.connection.target) over "
+    return "\(map.endpointName(edge.connection.source)) calls "
+      + "\(map.endpointName(edge.connection.target)) over "
       + "\(edge.connection.kind), \(count)"
   }
 }

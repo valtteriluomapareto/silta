@@ -214,6 +214,10 @@ final class AppModel {
   }
 
   func select(document ref: String?) {
+    // A refused triage belongs to the document it was sent from.
+    if documents.ref != ref, let target = target(Self.documentsTarget) {
+      actions.clearFailure(target)
+    }
     documents.ref = ref
     navigate(to: .docs)
   }
@@ -425,6 +429,7 @@ extension AppModel {
     taskDetail.clear()
     actions.selectedProposals = []
     droppingProposals = false
+    actions.selectedDocuments = []
     boardSelection = nil
     boardInspectorPresented = false
     workspaceSelection = nil
