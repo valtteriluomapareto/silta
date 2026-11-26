@@ -109,7 +109,7 @@ OVERVIEW: Record blockers; Silta sends nothing.
 
 After a handoff: silta task block AC-2 --on AC-1 -m "Waiting for API."
 
-USAGE: silta task block [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <ref> [--on <on> ...] [--follow-up <follow-up>]
+USAGE: silta task block [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <ref> [--on <on> ...] [--off <off> ...] [--follow-up <follow-up>]
 
 ARGUMENTS:
   <ref>                   The task reference.
@@ -128,8 +128,8 @@ OPTIONS:
                           none.
   --allow-secret          Retain detected secrets (human-only; use file input
                           for a body retry).
-  --on <on>               Task, ext:party or url:http(s) blockers; default is
-                          none. Silta sends nothing.
+  --on <on>               Blockers to add. Silta sends nothing.
+  --off <off>             Current blockers to remove.
   --follow-up <follow-up> UTC YYYY-MM-DD or Nd, default 7d; today/0d is allowed.
   --version               Show the version.
   -h, --help              Show help information.

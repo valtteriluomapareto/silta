@@ -38,6 +38,9 @@ package struct TaskBlockResult: Encodable, Sendable {
   /// First-party and secret-redaction diagnostics.
   package let warnings: [OutputWarning]
 
+  /// Whether this write recorded human consent. It is omitted from the receipt.
+  package let approvalUsed: Bool
+
   enum CodingKeys: String, CodingKey {
     case ref, status, waiting
     case followUpAt = "follow_up_at"
