@@ -74,6 +74,69 @@ struct GuideRecipeTests {
     }
   }
 
+  @Test(.timeLimit(.minutes(1)))
+  func codeRecipeRefreshesBeforeReading() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try GuideRecipeFixture(scratch)
+      let code = CodeCommandTests()
+      let branch = "refs/remotes/origin/api"
+      let cached = try code.git(["rev-parse", branch], fixture.repo, scratch)
+        .trimmingCharacters(in: .newlines)
+      try "Acme refreshed console\n".write(
+        to: fixture.repo.appending(path: "apps/console/README.md"),
+        atomically: true, encoding: .utf8)
+      try code.commitAll(fixture.repo, scratch)
+      let refreshed = try code.git(["rev-parse", "HEAD"], fixture.repo, scratch)
+        .trimmingCharacters(in: .newlines)
+      try code.git(["push", "origin", "HEAD:refs/heads/api"], fixture.repo, scratch)
+      try code.git(["update-ref", branch, cached], fixture.repo, scratch)
+
+      let result = try fixture.execute(firstCodeRead(fixture), task: "AC-1")
+      try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+      let data = try code.envelope(result.stdout)
+      withKnownIssue("SI-266: the guide reads the cached ref without fetching") {
+        #expect(data["sha"] as? String == refreshed)
+        #expect(data["output"] as? String == "README.md:1:Acme refreshed console\n")
+      }
+    }
+  }
+
+  @Test(.timeLimit(.minutes(1)))
+  func codeRecipeHasACachedRetryWhenFetchFails() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try GuideRecipeFixture(scratch)
+      let code = CodeCommandTests()
+      let cached = try code.git(["rev-parse", "origin/api"], fixture.repo, scratch)
+        .trimmingCharacters(in: .newlines)
+      try code.git(
+        ["remote", "set-url", "origin", scratch.appending(path: "missing-origin").path],
+        fixture.repo, scratch)
+      let failed = try fixture.execute(firstCodeRead(fixture), task: "AC-1")
+      withKnownIssue("SI-266: the guide does not give the fetch failure and cached retry") {
+        try #require(failed.termination == .exit(9), "\(failed.stdout)\(failed.stderr)")
+        let root = try GuideContractTests.object(failed.stdout)
+        let error = try #require(root["error"] as? [String: Any])
+        #expect(error["next_by"] as? String == "agent")
+        let next = try #require((error["next"] as? [String])?.first)
+        let retry = try fixture.execute(jsonCodeRead(next), task: "AC-1")
+        try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
+        #expect(try code.envelope(retry.stdout)["sha"] as? String == cached)
+        #expect(try code.warnings(retry.stdout)["ref_stale"] != nil)
+      }
+    }
+  }
+
+  private func firstCodeRead(_ fixture: GuideRecipeFixture) throws -> String {
+    let guide = try fixture.run(["guide", "recipes"]).stdout
+    let first = try #require(
+      Self.blocks(guide).first?.components(separatedBy: "\n").first)
+    return jsonCodeRead(first)
+  }
+
+  private func jsonCodeRead(_ command: String) -> String {
+    command.replacingOccurrences(of: " code grep ", with: " --json code grep ")
+  }
+
   static func blocks(_ text: String) -> [String] {
     text.components(separatedBy: "```sh\n").dropFirst().compactMap {
       $0.components(separatedBy: "```").first
