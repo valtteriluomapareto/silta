@@ -92,10 +92,14 @@ extension GuideCommand {
         Examples use the fictional Acme workspace and task AC-12. Replace names and paths with \
         refs from your brief. Examples carry --ws acme explicitly, including outside repositories.
 
-        Read another app without checking out its branch:
+        Read another app's committed code. When current code matters, use --fetch with a \
+        remote-tracking ref on your first read per repository per session. A full commit SHA \
+        pins the read and needs no refresh. Fetch updates remote-tracking refs. Local branch \
+        names still point to local commits. If the fetch fails, run the printed cached retry \
+        and report its SHA with freshness unverified.
         ```sh
-        silta --ws acme code grep platform-api -- 'Auth'
-        silta --ws acme code show platform-api -- 'src/Auth.swift'
+        silta --ws acme code grep platform-api@origin/api --fetch -- 'Auth'
+        silta --ws acme code show platform-api@origin/api -- 'src/Auth.swift'
         ```
 
         Use task add for a new task, task plan for a chosen task's checklist, and from-plan to \
