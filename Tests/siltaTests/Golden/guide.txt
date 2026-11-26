@@ -4,6 +4,7 @@ Use Silta for cross-repo work, another app or backend, branch-as-app repos, plan
 # Session start
 If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta --ws acme brief --task AC-12`, then `silta --ws acme task start AC-12`. Replace acme with the workspace from your brief. Text is the default; use --json only to parse output.
 Workspace commands use --ws, then the registered repository here, then the default from `ws use` outside registered repositories. Commands here follow the workspace in `brief`; use --ws for intentional cross-workspace work. Inference never saves a selection. For several matching workspaces, inspect the scoped candidates and retry with --ws.
+Outside Git, run `silta --ws acme brief` for workspace context or use the saved default.
 Use the app `slug` from `ws show` in commands and references. The optional `apps[].name` is a display label.
 Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
 For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.
@@ -11,10 +12,10 @@ For "work the backlog", run `silta --ws acme task ls --status todo`, optionally 
 # Recipes
 Examples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief. Examples carry --ws acme explicitly, including outside repositories.
 
-Read another app without checking out its branch:
+Read another app's committed code. When current code matters, use --fetch with a remote-tracking ref on your first read per repository per session. A full commit SHA pins the read and needs no refresh. Fetch updates remote-tracking refs. Local branch names still point to local commits. If the fetch fails, run the printed cached retry and report its SHA with freshness unverified.
 ```sh
-silta --ws acme code grep platform-api -- 'Auth'
-silta --ws acme code show platform-api -- 'src/Auth.swift'
+silta --ws acme code grep platform-api@origin/api --fetch -- 'Auth'
+silta --ws acme code show platform-api@origin/api -- 'src/Auth.swift'
 ```
 
 Use task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved. Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files. Don't import or --delete a plan file the repository's instructions require; point the task plan at it.

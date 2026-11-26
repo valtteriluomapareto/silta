@@ -33,17 +33,8 @@ struct WhereCommand: OutputCommand {
         command: "silta where")
     }
     let directory = URL(filePath: path ?? FileManager.default.currentDirectoryPath)
-    let service = LocationService(environment: context.environment)
-    var approvalUsed = false
-    let result: LocationResult
-    if setApp != nil || unset {
-      (result, approvalUsed) = try await service.override(
-        path: directory, workspace: global.ws,
-        app: setApp, approved: global.approved)
-    } else {
-      result = try await service.resolve(
-        path: directory, workspace: global.ws, app: app, task: task)
-    }
+    let (result, approvalUsed) = try await locate(
+      directory, with: LocationService(environment: context.environment))
     let head = result.head.isEmpty ? "(no commits)" : result.head
     var text =
       "\(result.workspace) / \(result.repo) / \(result.app ?? "unresolved")"
@@ -76,5 +67,22 @@ struct WhereCommand: OutputCommand {
       text: text, quiet: quiet, data: result,
       warnings: result.warnings, approvalUsed: approvalUsed
     ).reporting(result.workspace)
+  }
+
+  private func locate(_ directory: URL, with service: LocationService) async throws
+    -> (LocationResult, Bool)
+  {
+    do {
+      if setApp != nil || unset {
+        return try await service.override(
+          path: directory, workspace: global.ws, app: setApp, approved: global.approved)
+      }
+      return (
+        try await service.resolve(path: directory, workspace: global.ws, app: app, task: task),
+        false
+      )
+    } catch LocationError.outsideRepository {
+      throw try service.outsideGitFailure(workspace: global.ws, path: path.map { _ in directory })
+    }
   }
 }
