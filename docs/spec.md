@@ -322,7 +322,7 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | unlink | promote | block | unblock | handoff | discussion | secret_redacted
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | handoff | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
   -- handoff: the comment ref when no claim was released.
@@ -769,9 +769,10 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   link shown by `task show`. It accepts app and topic targets and retained legacy
   edge and service targets. The relations are `cites` (default), `about`, `source`
   and `relates`. Claim and promoted-task rules apply even when the task is closed
-  or archived. A successful removal records an `unlink` event. JSON includes
-  `ref`, `status` and `removed`. An already absent link returns `removed: false`
-  without changing the task or its history.
+  or archived. A successful removal records a `field` event with body
+  `unlinked <relation> <target>`. JSON includes `ref`, `status` and `removed`.
+  An absent link to an existing target returns `removed: false` without changing
+  the task or its history.
 - **Receipts say what changed:** `AC-5 archived`, `AC-5 kept`, `AC-14 linked cites
   task:AC-2` (the target as `show` prints it), `AC-5 promoted to ado:4711; read-only
   here`, `AC-5 edited: title, plan` (or `AC-5 unchanged`). Their `--json` data stays
@@ -3132,7 +3133,7 @@ the selected snapshot. The metadata-only v9 migration raises the writer floor
 because earlier writers can reassign historical names (D32).
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
-item and its docs. Proposal-only or archived docs and `cites` links do not pin map
+item and its docs. Proposal-only or archived docs and document `cites` links do not pin map
 items; removing an item cleans its non-pinning doc links in the same transaction.
 Task map links and primary app assignments also pin items. A task conflict points
 to `task show` for inspecting the exact link or assignment. Use `task unlink` for

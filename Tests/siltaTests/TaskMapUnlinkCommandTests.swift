@@ -43,6 +43,7 @@ struct TaskMapUnlinkCommandTests {
       Golden.forTests().check(first.stdout, "task-unlink.json")
       #expect(try identities(store) == before.filter { $0 != "task|1|about|app|1" })
       let audit = try changeState(store)
+      #expect(audit.filter { $0 == "field|unlinked about app:api" }.count == 1)
       let repeated = try run(
         ["task", "unlink", "AC-1", "app:api", "--rel", "about"],
         scratch, now: "2023-11-15T22:13:20.000Z")
@@ -53,6 +54,30 @@ struct TaskMapUnlinkCommandTests {
 
       try releaseRemainingPins(andApply: edit, in: scratch)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM app") } == 1)
+    }
+  }
+
+  @Test func onlyActualUnlinkRefreshesAnOwnedClaim() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      try seedTasks(store)
+      try success(["task", "link", "AC-2", "app:api"], scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE task SET status='doing', claimed_by='agent:codex:acme',
+              claimed_at='2023-11-14T22:12:20.000Z' WHERE seq=2;
+            """)
+      }
+      let unlink = ["task", "unlink", "AC-2", "app:api"]
+      try success(unlink, scratch)
+      let changed = try #require(try claimState(store))
+      let times = changed.split(separator: "|")
+      #expect(times.count == 2 && times.first == times.last)
+      #expect(times.first?.hasPrefix("2023-11-14T22:13:20.") == true)
+      let removed = try run(unlink, scratch, now: "2023-11-14T22:14:20.000Z")
+      #expect(removed.termination == .exit(0) && removed.stdout.contains("no matching"))
+      #expect(try claimState(store) == changed)
     }
   }
 
@@ -163,6 +188,12 @@ struct TaskMapUnlinkCommandTests {
           SELECT updated_at FROM task WHERE id=1
           UNION ALL SELECT kind || '|' || COALESCE(body,'') FROM task_event WHERE task_id=1
           """)
+    }
+  }
+
+  private func claimState(_ store: DatabaseStore) throws -> String? {
+    try store.read {
+      try String.fetchOne($0, sql: "SELECT claimed_at || '|' || updated_at FROM task WHERE seq=2")
     }
   }
 

@@ -5,7 +5,8 @@ struct TaskUnlinkCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "unlink", abstract: "Remove one task link to a workspace map item.",
     discussion: "Use the exact relation and target shown by task show. "
-      + "Removing an absent link succeeds with removed=false. Blockers belong to task block.\n"
+      + "An absent link to an existing map target returns removed=false. "
+      + "Blockers belong to task block.\n"
       + "Remove an Acme map link: silta task unlink AC-1 app:api --rel about")
 
   static let dataShape = Shape.object(["ref": .string, "status": .string, "removed": .bool])

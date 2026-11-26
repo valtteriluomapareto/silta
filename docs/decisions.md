@@ -785,10 +785,10 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   including restore of older supported formats. Legacy edge kinds retain their
   existing round-trip behavior. See [spec §15](spec.md#15-export-backup-restore).
 
-  Task-link input does not yet accept edge/service targets: its add-only surface
-  has no unlink recovery. The internal resolver serves doc attachments, whose
-  accepted set can be replaced. Typed task prefixes refuse instead of falling
-  back to code; explicit `code:` retains legacy app access.
+  Creating task links still refuses edge/service targets. `task unlink` accepts
+  their typed refs to remove existing legacy pins. The internal resolver also
+  serves doc attachments, whose accepted set can be replaced. Typed task prefixes
+  refuse instead of falling back to code; explicit `code:` retains legacy app access.
 
   Stored `edge.code_refs` already identify code. Their read boundary preserves
   existing implicit values, including reserved app names and explicit branches,

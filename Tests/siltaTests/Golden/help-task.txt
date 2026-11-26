@@ -517,8 +517,8 @@ OPTIONS:
 
 OVERVIEW: Remove one task link to a workspace map item.
 
-Use the exact relation and target shown by task show. Removing an absent link
-succeeds with removed=false. Blockers belong to task block.
+Use the exact relation and target shown by task show. An absent link to an
+existing map target returns removed=false. Blockers belong to task block.
 Remove an Acme map link: silta task unlink AC-1 app:api --rel about
 
 USAGE: silta task unlink [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> <target> [--rel <rel>]

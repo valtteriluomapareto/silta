@@ -86,7 +86,8 @@ extension TaskService {
       guard tx.database.changesCount != 0 else { return (result, false) }
       try refreshLinkTask(task, at: at, in: tx)
       try changed(
-        task.id, kind: "unlink", body: relation + " " + rendered, redacted: false, at: at, in: tx)
+        task.id, kind: "field", body: "unlinked " + relation + " " + rendered,
+        redacted: false, at: at, in: tx)
       return (result, true)
     }
   }
