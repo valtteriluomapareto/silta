@@ -132,10 +132,13 @@ package struct DocWriteService {
       }
       let metadata = try DocMetadata.resolve(draft, baseline: baseline, workspace: id, in: db)
       try policy.identities(metadata.refs, keeping: retainedRefs)
+      let warnings = metadata.targets.flatMap(\.warnings).reduce(into: [OutputWarning]()) {
+        if !$0.contains($1) { $0.append($1) }
+      }
       return CapturedEdit(
         id: id, baseline: baseline, draft: draft,
         binding: try DocVerification.binding(metadata, workspace: id, in: db),
-        redacted: redacted, mapWarnings: metadata.targets.flatMap(\.warnings))
+        redacted: redacted, mapWarnings: warnings)
     }
   }
 

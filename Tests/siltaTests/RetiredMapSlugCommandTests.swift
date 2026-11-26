@@ -14,6 +14,14 @@ struct RetiredMapSlugCommandTests {
 
     """
 
+  private let withoutAPI = """
+    workspace: {slug: acme, name: Acme, task_prefix: AC}
+    repos: [{slug: platform}]
+    apps: []
+    topics: [{slug: other, aliases: [Alerts]}]
+
+    """
+
   @Test func removalReservesEveryNameAndReleaseIsScoped() throws {
     try withScratchDirectory { scratch in
       let store = BriefCommandTests().store(scratch)
@@ -29,43 +37,94 @@ struct RetiredMapSlugCommandTests {
       #expect(linked.termination == .exit(0) && linked.stdout.contains("renamed"))
       #expect(linked.stdout.contains("renamed to shipping"))
       #expect(try appUID(store) == uid)
-      let removed =
-        original
-        .replacingOccurrences(
-          of: "apps: [{slug: api, repo: platform, ref: main}]", with: "apps: []"
-        )
-        .replacingOccurrences(of: "{slug: api, aliases: [Messages]}, ", with: "")
-      try saved(removed, scratch)
+      let removal = try changes(withoutAPI, scratch)
+      #expect(
+        removal["retired"] as? [String] == ["app:api", "app:delivery", "app:shipping", "topic:api"])
+      try saved(withoutAPI, scratch)
       let exported = try show(scratch)
       let staleStamp = try stamp(exported)
-      withKnownIssue("SI-244: deleted current names are not reserved and managed consistently") {
-        #expect(exported.contains("# Retired app slugs: api, delivery, shipping"))
-        #expect(exported.contains("# Retired topic slugs: api"))
-        let add = removed.replacingOccurrences(
-          of: "apps: []", with: "apps: [{slug: shipping, repo: platform, ref: main}]")
-        let refused = try edit(add, scratch)
-        #expect(
-          (try TaskStateCommandTests.error(refused)["message"] as? String)?
-            .contains("App slug shipping is retired") == true)
-        let released = add + "released: {apps: [api, delivery, shipping]}\n"
-        let unstamped = try edit(released, scratch)
-        #expect(unstamped.termination == .exit(1))
-        let preview = try edit(staleStamp + released, scratch, preview: true)
-        let changes = try #require(
-          (try TaskStateCommandTests.data(preview))["changes"] as? [String: Any])
-        #expect(changes["released"] as? [String] == ["app:api", "app:delivery", "app:shipping"])
-        #expect(changes["added"] as? [String] == ["app:shipping"])
-        #expect(try show(scratch) == exported)
-        try saved(staleStamp + released, scratch)
-        let current = try show(scratch)
-        #expect(!current.contains("Retired app slugs") && current.contains("Retired topic slugs"))
-        #expect(try edit(staleStamp + released, scratch).termination == .exit(6))
-        try saved(current + "released: {topics: [api]}\n", scratch)
-        #expect(!(try show(scratch)).contains("Retired topic slugs"))
-        #expect(
-          try store.read {
-            try String.fetchOne($0, sql: "SELECT settings FROM workspace")
-          } == "{}")
+      #expect(exported.contains("# Retired app slugs: api, delivery, shipping"))
+      #expect(exported.contains("# Retired topic slugs: api"))
+      let add = withoutAPI.replacingOccurrences(
+        of: "apps: []", with: "apps: [{slug: shipping, repo: platform, ref: main}]")
+      let refused = try edit(add, scratch)
+      #expect(
+        (try TaskStateCommandTests.error(refused)["message"] as? String)?
+          .contains("App slug shipping is retired") == true)
+      let released = add + "released: {apps: [api, delivery, shipping]}\n"
+      let unstamped = try edit(released, scratch)
+      #expect(unstamped.termination == .exit(1))
+      let reuse = try changes(staleStamp + released, scratch)
+      #expect(reuse["released"] as? [String] == ["app:api", "app:delivery", "app:shipping"])
+      #expect(reuse["added"] as? [String] == ["app:shipping"])
+      #expect(try show(scratch) == exported)
+      try saved(staleStamp + released, scratch)
+      #expect(try appUID(store) != uid)
+      let current = try show(scratch)
+      #expect(!current.contains("Retired app slugs") && current.contains("Retired topic slugs"))
+      #expect(try edit(staleStamp + released, scratch).termination == .exit(6))
+      try saved(current + "released: {topics: [api]}\n", scratch)
+      #expect(!(try show(scratch)).contains("Retired topic slugs"))
+      #expect(
+        try store.read {
+          try String.fetchOne($0, sql: "SELECT settings FROM workspace")
+        } == "{}")
+    }
+  }
+
+  @Test func refusesReleaseOfLiveHistoricalUnknownAndNewlyRetiredNames() throws {
+    try withScratchDirectory { scratch in
+      let store = BriefCommandTests().store(scratch)
+      try AcmeDocAttachments.apply(original, to: store)
+      let renamed = original.replacingOccurrences(
+        of: "slug: api, repo:", with: "slug: delivery, previous: [api], repo:")
+      try saved(renamed, scratch)
+      let shown = try show(scratch)
+      let removed = renamed.replacingOccurrences(
+        of: "apps: [{slug: delivery, previous: [api], repo: platform, ref: main}]", with: "apps: []"
+      )
+      let initialStamp = try stamp(shown)
+      for (yaml, name) in [
+        (renamed, "delivery"), (renamed, "api"), (renamed, "unknown"), (removed, "delivery"),
+      ] {
+        let input = initialStamp + yaml + "released: {apps: [\(name)]}\n"
+        for preview in [true, false] {
+          let result = try edit(input, scratch, preview: preview)
+          let error = try TaskStateCommandTests.error(result)
+          #expect(result.termination == .exit(1))
+          #expect(
+            (error["message"] as? String)?.contains("App slug \(name) is not already retired.")
+              == true)
+        }
+      }
+      #expect(try show(scratch) == shown)
+    }
+  }
+
+  @Test func exportRestoreRetainsBothNamespaces() throws {
+    try withScratchDirectory { scratch in
+      let store = BriefCommandTests().store(scratch)
+      try AcmeDocAttachments.apply(original, to: store)
+      let removed = """
+        workspace: {slug: acme, name: Acme, task_prefix: AC}
+        apps: []
+        topics: []
+
+        """
+      try saved(removed, scratch)
+      let root = scratch.appending(path: "out")
+      let export = try run(["export", "--to", root.path], scratch)
+      try #require(export.termination == .exit(0), "\(export.stdout)\(export.stderr)")
+      try withScratchDirectory { restored in
+        let tree = root.appending(path: "acme").path
+        let result = try run(["restore", tree, "--approved", "Restore Acme."], restored)
+        try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+        let shown = try show(restored)
+        #expect(shown.contains("# Retired app slugs: api"))
+        #expect(shown.contains("# Retired topic slugs: api, other"))
+        let resultAfterRestore = try edit(original, restored, preview: true)
+        #expect(resultAfterRestore.termination == .exit(1))
+        #expect(resultAfterRestore.stdout.contains("App slug api is retired"))
       }
     }
   }
@@ -79,18 +138,16 @@ struct RetiredMapSlugCommandTests {
       let moved = original.replacingOccurrences(of: ", aliases: [Messages]", with: "")
         .replacingOccurrences(of: "[Alerts]", with: "[Alerts, Messages]")
       let preview = try edit(moved, scratch, preview: true)
-      withKnownIssue("SI-244: alias-only edits are missing from the preview") {
-        let changes = try #require(
-          (try TaskStateCommandTests.data(preview))["changes"] as? [String: Any])
-        let aliases = try #require(changes["aliases_changed"] as? [[String: Any]])
-        #expect(aliases.count == 2)
-        #expect(aliases.first?["topic"] as? String == "topic:api")
-        #expect(aliases.first?["removed"] as? [String] == ["messages"])
-        #expect(aliases.last?["topic"] as? String == "topic:other")
-        #expect(aliases.last?["added"] as? [String] == ["messages"])
-        let unchanged = try edit(caseOnly, scratch, preview: true)
-        #expect(!unchanged.stdout.contains("aliases_changed"))
-      }
+      let changes = try #require(
+        (try TaskStateCommandTests.data(preview))["changes"] as? [String: Any])
+      let aliases = try #require(changes["aliases_changed"] as? [[String: Any]])
+      #expect(aliases.count == 2)
+      #expect(aliases.first?["topic"] as? String == "topic:api")
+      #expect(aliases.first?["removed"] as? [String] == ["messages"])
+      #expect(aliases.last?["topic"] as? String == "topic:other")
+      #expect(aliases.last?["added"] as? [String] == ["messages"])
+      let unchanged = try edit(caseOnly, scratch, preview: true)
+      #expect(!unchanged.stdout.contains("aliases_changed"))
       #expect(try show(scratch) == shown)
     }
   }
@@ -111,16 +168,14 @@ struct RetiredMapSlugCommandTests {
         of: "slug: api, repo:", with: "slug: site, previous: [api], repo:")
       let reserved = original.replacingOccurrences(
         of: "slug: api, repo:", with: "slug: doc, previous: [api], repo:")
-      withKnownIssue("SI-244: collision errors name the wrong slug or reason") {
-        for (yaml, expected) in [
-          (duplicate, "App slug api belongs to app:api"),
-          (collision, "App slug site belongs to app:site"),
-          (reserved, "Cannot rename an app to reserved slug doc"),
-        ] {
-          let result = try edit(yaml, scratch, preview: true)
-          let error = try TaskStateCommandTests.error(result)
-          #expect((error["message"] as? String)?.contains(expected) == true)
-        }
+      for (yaml, expected) in [
+        (duplicate, "App slug api belongs to app:api"),
+        (collision, "App slug site belongs to app:site"),
+        (reserved, "Cannot rename an app to reserved slug doc"),
+      ] {
+        let result = try edit(yaml, scratch, preview: true)
+        let error = try TaskStateCommandTests.error(result)
+        #expect((error["message"] as? String)?.contains(expected) == true)
       }
     }
   }
@@ -145,17 +200,20 @@ struct RetiredMapSlugCommandTests {
       let data = try GuideContractTests.object(result.stdout)
       let warnings = try #require(data["warnings"] as? [[String: String]])
         .filter { $0["code"] == "renamed" }
-      withKnownIssue("SI-244: app and edge repeats emit identical rename warnings") {
-        #expect(warnings.count == 2)
-        #expect(warnings.contains { $0["message"]?.contains("App api was renamed") == true })
-        #expect(
-          warnings.contains { $0["message"]?.contains("Topic messaging was renamed") == true })
-      }
+      #expect(warnings.count == 2)
+      #expect(warnings.contains { $0["message"]?.contains("App api was renamed") == true })
+      #expect(
+        warnings.contains { $0["message"]?.contains("Topic messaging was renamed") == true })
     }
   }
 
   private func appUID(_ store: DatabaseStore) throws -> String? {
     try store.read { try String.fetchOne($0, sql: "SELECT uid FROM app") }
+  }
+
+  private func changes(_ yaml: String, _ scratch: URL) throws -> [String: Any] {
+    let preview = try edit(yaml, scratch, preview: true)
+    return try #require((try TaskStateCommandTests.data(preview))["changes"] as? [String: Any])
   }
 
   private func edit(_ yaml: String, _ scratch: URL, preview: Bool = false) throws -> CLIResult {

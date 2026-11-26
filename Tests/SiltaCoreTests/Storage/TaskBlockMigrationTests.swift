@@ -30,7 +30,7 @@ struct TaskBlockMigrationTests {
         let version = try String.fetchOne(
           db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
         let settings = try String.fetchOne(db, sql: "SELECT settings FROM workspace")
-        #expect(version == "10" && settings == "{\"future\":42}")
+        #expect(version == "11" && settings == "{\"future\":42}")
       }
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: home.appending(path: "backups").path)

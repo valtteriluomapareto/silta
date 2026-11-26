@@ -290,6 +290,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     binary's columns.
   - A newer schema that also lacks one of this binary's migrations has diverged, and
     is refused. So migrations are never squashed or renamed once shipped.
+  - v11 retires the current slug along with an app's or topic's former slugs. A v10
+    editor could remove a row and leave its current name available. v11 preserves
+    recorded reservations and requires an explicit release to reuse them.
 - **D33: Actors are `ActorID` values, validated where they enter.**
   - `human(name)` or `agent(tool, session)`, recorded as `human:<name>` or
     `agent:<tool>:<session>`. A name or session is 1 to 64 letters, digits, `.`, `_`

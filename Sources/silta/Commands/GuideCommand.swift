@@ -239,8 +239,10 @@ extension GuideCommand {
         workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. \
         Unstamped YAML uses the configuration at command start.
         To rename an app or topic, change its `slug` and list the old slug in `previous`. \
-        Preview adds, removals, renames and blockers with `silta --ws acme ws edit --dry-run \
-        -F <file>` before requesting approval.
+        `ws show` lists retired slugs. To release one, add `released: {apps: [old-api]}` or \
+        `released: {topics: [old-topic]}` and keep the baseline comment. Released references may \
+        resolve to a new identity. Preview map changes, alias moves and blockers with \
+        `silta --ws acme ws edit --dry-run -F <file>` before requesting approval.
         Set a display label with the optional `name` key under `apps` in workspace YAML. \
         Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` \
         and use the slug in commands and references.

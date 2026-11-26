@@ -82,7 +82,10 @@ struct WorkspaceRenameCommandTests {
       let removed = try Self.edit(
         AcmeDocAttachments.yaml(removing: "app"), flags: Self.approval, in: scratch)
       try #require(removed.termination == .exit(0), "\(removed.stderr)")
-      let replaced = try Self.edit(AcmeDocAttachments.yaml(), flags: Self.approval, in: scratch)
+      let shown = try Self.show(in: scratch)
+      let stamp = try #require(shown.split(separator: "\n").first)
+      let reuse = stamp + "\n" + AcmeDocAttachments.yaml() + "\nreleased: {apps: [api]}\n"
+      let replaced = try Self.edit(String(reuse), flags: Self.approval, in: scratch)
       try #require(replaced.termination == .exit(0), "\(replaced.stderr)")
       let fresh = try Self.show(in: scratch)
       #expect(fresh.split(separator: "\n").dropFirst() == old.split(separator: "\n").dropFirst())
@@ -314,7 +317,7 @@ extension WorkspaceRenameCommandTests {
         ["restore", "out/acme", "--dry-run", "--json"], in: scratch,
         environment: ["SILTA_HOME": target.path])
       #expect(result.termination == .exit(1))
-      #expect(result.stdout.contains("conflicting or reserved ownership"))
+      #expect(result.stdout.contains("App slug api belongs to app:api"))
       #expect(!FileManager.default.fileExists(atPath: target.appending(path: "silta.db").path))
     }
   }

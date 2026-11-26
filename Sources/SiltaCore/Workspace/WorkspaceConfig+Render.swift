@@ -49,9 +49,23 @@ private struct WorkspaceRenderer {
       "settings: "
       + (try WorkspaceConfig.json(settings))
       + "\n"
+    renderRetiredSlugs(stored)
     try renderAppsAndRepos()
     try renderRelationships()
     return output
+  }
+
+  private mutating func renderRetiredSlugs(_ settings: Any) {
+    guard let mapping = settings as? [String: Any],
+      let retired = try? WorkspaceSlugs.retired(mapping)  // Keep malformed maps inspectable.
+    else { return }
+    for kind in WorkspaceSlugs.Kind.allCases {
+      guard let names = retired[kind.rawValue], !names.isEmpty else { continue }
+      output +=
+        "# Retired \(kind.rawValue) slugs: "
+        + names.sorted().map(TaskError.shown)
+        .joined(separator: ", ") + "\n"
+    }
   }
 
   mutating func section(_ name: String, _ rows: [Any]) throws {

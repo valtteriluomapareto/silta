@@ -29,11 +29,9 @@ struct MapSlugRetirementMigrationTests {
           home)
         let after = try snapshot(store)
         if upgraded {
-          withKnownIssue("SI-244: v10 can delete a name without reserving the current slug") {
-            #expect(result.termination == .exit(9))
-            #expect(result.stdout.contains("Database requires a newer version of silta."))
-            #expect(after == before)
-          }
+          #expect(result.termination == .exit(9))
+          #expect(result.stdout.contains("Database requires a newer version of silta."))
+          #expect(after == before)
         } else {
           #expect(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
           #expect(after != before)

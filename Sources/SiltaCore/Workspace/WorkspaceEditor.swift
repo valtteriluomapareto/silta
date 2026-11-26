@@ -53,6 +53,7 @@ package enum WorkspaceEditor {
     }
     try baseline.check(stamp: stamp)
     let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
+    try baseline.checkReleases(config, stamp: stamp)
     if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) {
       try store.read(baseline.check)
       return nil
@@ -73,6 +74,7 @@ package enum WorkspaceEditor {
     let (stamp, text) = try Baseline.payload(document, workspace: baseline.slug)
     try baseline.check(stamp: stamp)
     let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
+    try baseline.checkReleases(config, stamp: stamp)
     try checkSlug(config, baseline: baseline)
     guard baseline.slug != nil else { throw WorkspaceError.notFound }
     return try store.read { db in
@@ -141,6 +143,14 @@ package enum WorkspaceEditor {
 
     func check(stamp: Substring?) throws {
       if let stamp, stamp != token { throw WorkspaceEditConflict(workspace: slug) }
+    }
+
+    func checkReleases(_ config: WorkspaceConfig, stamp: Substring?) throws {
+      guard config.hasReleases, stamp == nil else { return }
+      throw CommandFailure(
+        error: WorkspaceError.invalid(["Releasing retired slugs requires a baseline from ws show."]
+        ),
+        next: [workspaceEditRead(slug)])
     }
 
     func check(in db: Database) throws {
