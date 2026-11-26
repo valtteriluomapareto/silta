@@ -322,7 +322,7 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | handoff | discussion | secret_redacted
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | unlink | promote | block | unblock | handoff | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
   -- handoff: the comment ref when no claim was released.
