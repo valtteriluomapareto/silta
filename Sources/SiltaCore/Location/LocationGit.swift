@@ -61,12 +61,7 @@ struct LocationGit {
   func commonDirectory() async throws -> URL? {
     let result = try await run(["rev-parse", "--path-format=absolute", "--git-common-dir"])
     guard result.termination == .exit(0) else {
-      if case .exit = result.termination,
-        (String(bytes: result.stderr, encoding: .utf8) ?? "").contains("not a git repository"),
-        !hasRepositoryMarker
-      {
-        return nil
-      }
+      if Self.isOutsideRepository(result, at: directory) { return nil }
       throw LocationError.git
     }
     guard var path = String(data: result.stdout, encoding: .utf8) else { throw LocationError.git }
@@ -74,7 +69,14 @@ struct LocationGit {
     return try LocationPath.canonical(URL(filePath: path))
   }
 
-  private var hasRepositoryMarker: Bool {
+  static func isOutsideRepository(_ result: GitResult, at directory: URL) -> Bool {
+    guard case .exit(let status) = result.termination, status != 0,
+      (String(bytes: result.stderr, encoding: .utf8) ?? "").contains("not a git repository")
+    else { return false }
+    return !hasRepositoryMarker(at: directory)
+  }
+
+  private static func hasRepositoryMarker(at directory: URL) -> Bool {
     var ancestor = directory
     while ancestor.path != "/" {
       if FileManager.default.fileExists(atPath: ancestor.appending(path: ".git").path) {

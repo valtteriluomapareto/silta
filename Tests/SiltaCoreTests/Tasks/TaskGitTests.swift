@@ -141,7 +141,7 @@ struct TaskGitTests {
       draft.app = "api"
       let service = TaskService(environment: env)
       _ = try await service.add(draft, directory: home)
-      await #expect(throws: TaskError.foreignRepo) {
+      await #expect(throws: CommandFailure.self) {
         _ = try await service.start("AC-1", directory: cwd)
       }
       #expect(try service.show("AC-1").status == "todo")

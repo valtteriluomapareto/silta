@@ -18,25 +18,26 @@ struct TaskStartRecoveryCommandTests {
       let refusal = try run(starts, at: wrong, scratch: scratch)
       #expect(try task(at: repo, scratch: scratch)["claimed_by"] == nil)
 
-      withKnownIssue("SI-265: a wrong-directory task start lacks a scoped Git retry") {
-        let error = try TaskStateCommandTests.error(refusal)
-        #expect(refusal.termination == .exit(1))
-        #expect(error["code"] as? String == "invalid")
-        #expect(error["next_by"] as? String == "agent")
-        let command = try #require((error["next"] as? [String])?.first)
-        try #require(command.hasPrefix("cd " + shellWord(repo.path) + " && "))
-        let retry = try execute(command, at: wrong, scratch: scratch)
-        try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
+      let error = try TaskStateCommandTests.error(refusal)
+      #expect(refusal.termination == .exit(1))
+      #expect(error["code"] as? String == "invalid")
+      #expect(error["next_by"] as? String == "agent")
+      let normalized = refusal.stdout.replacingOccurrences(
+        of: scratch.path + "/", with: "<scratch>/")
+      Golden.forTests().check(normalized, "task-start-directory.json")
+      let command = try #require((error["next"] as? [String])?.first)
+      try #require(command.hasPrefix("cd " + shellWord(repo.path) + " && "))
+      let retry = try execute(command, at: wrong, scratch: scratch)
+      try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
 
-        let claimed = try task(at: repo, scratch: scratch)
-        #expect(claimed["branch"] as? String == "task-work")
-        let path = try #require(claimed["worktree"] as? String)
-        #expect(
-          URL(filePath: path).resolvingSymlinksInPath().path == repo.resolvingSymlinksInPath().path)
-        let plan = try run(
-          ["task", "plan", "AC-1", "-m", "Acme steps\n- [ ] Continue"], at: repo, scratch: scratch)
-        #expect(plan.termination == .exit(0), "\(plan.stdout)\(plan.stderr)")
-      }
+      let claimed = try task(at: repo, scratch: scratch)
+      #expect(claimed["branch"] as? String == "task-work")
+      let path = try #require(claimed["worktree"] as? String)
+      #expect(
+        URL(filePath: path).resolvingSymlinksInPath().path == repo.resolvingSymlinksInPath().path)
+      let plan = try run(
+        ["task", "plan", "AC-1", "-m", "Acme steps\n- [ ] Continue"], at: repo, scratch: scratch)
+      #expect(plan.termination == .exit(0), "\(plan.stdout)\(plan.stderr)")
     }
   }
 
@@ -48,8 +49,9 @@ struct TaskStartRecoveryCommandTests {
         try $0.database.execute(
           sql: """
             UPDATE task
-            SET status='doing',claimed_by='agent:codex:other',claimed_at='2023-11-14T22:13:20.000Z'
-            """)
+            SET status='doing',claimed_by='agent:codex:other',
+              claimed_at='2023-11-14T22:13:20.000Z',worktree=?
+            """, arguments: [repo.path])
       }
       let words = "Let Acme resume the claim."
       let refusal = try run(
@@ -59,19 +61,19 @@ struct TaskStartRecoveryCommandTests {
       #expect(try task(at: repo, scratch: scratch)["claimed_by"] as? String == "agent:codex:other")
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
 
-      withKnownIssue("SI-265: an approved steal has no safe recovery from the wrong directory") {
-        let error = try TaskStateCommandTests.error(refusal)
-        let command = try #require((error["next"] as? [String])?.first)
-        let placeholder = #""<the human's words>""#
-        try #require(command.hasSuffix(" --steal --approved " + placeholder))
-        let retry = try execute(
-          command.replacingOccurrences(of: placeholder, with: shellWord(words)),
-          at: scratch, scratch: scratch)
-        try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
-        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
-        #expect(
-          try task(at: repo, scratch: scratch)["claimed_by"] as? String != "agent:codex:other")
-      }
+      let error = try TaskStateCommandTests.error(refusal)
+      let next = try #require(error["next"] as? [String])
+      #expect(next.first == "silta --ws 'acme' task show 'AC-1'")
+      let command = try #require(next.last)
+      let placeholder = #""<the human's words>""#
+      try #require(command.hasSuffix(" --steal --approved " + placeholder))
+      let retry = try execute(
+        command.replacingOccurrences(of: placeholder, with: shellWord(words)),
+        at: scratch, scratch: scratch)
+      try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
+      #expect(
+        try task(at: repo, scratch: scratch)["claimed_by"] as? String != "agent:codex:other")
     }
   }
 
@@ -79,13 +81,11 @@ struct TaskStartRecoveryCommandTests {
     try withScratchDirectory { scratch in
       _ = try setup(scratch, name: "Acme\nunsafe")
       let refusal = try run(["task", "start", "AC-1", "--json"], at: scratch, scratch: scratch)
-      withKnownIssue("SI-265: a wrong-directory error cannot recover an unsafe clone path") {
-        let error = try TaskStateCommandTests.error(refusal)
-        #expect(error["code"] as? String == "invalid")
-        #expect(error["next_by"] as? String == "agent")
-        #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show"])
-        #expect(!refusal.stdout.contains("Acme\\nunsafe"))
-      }
+      let error = try TaskStateCommandTests.error(refusal)
+      #expect(error["code"] as? String == "invalid")
+      #expect(error["next_by"] as? String == "agent")
+      #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show"])
+      #expect(!refusal.stdout.contains("Acme\\nunsafe"))
     }
   }
 
@@ -124,7 +124,8 @@ struct TaskStartRecoveryCommandTests {
       try $0.database.execute(
         sql: """
           UPDATE repo_path SET path=?;
-          INSERT INTO task(uid,workspace_id,seq,title,status,app_id,created_by,created_at,updated_at)
+          INSERT INTO task(
+            uid,workspace_id,seq,title,status,app_id,created_by,created_at,updated_at)
           SELECT 'acme-start',workspace_id,1,'Acme starting task','todo',id,'human:acme',
             '2023-11-14T22:13:20.000Z','2023-11-14T22:13:20.000Z' FROM app WHERE slug='api';
           """, arguments: [repo.path])
