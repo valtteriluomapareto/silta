@@ -75,6 +75,7 @@ extension GuideCommand {
         in `brief`; use --ws for intentional cross-workspace work. Inference never saves a \
         selection. For several matching workspaces, inspect the scoped candidates and retry \
         with --ws.
+        Outside Git, run `silta --ws acme brief` for workspace context or use the saved default.
         Use the app `slug` from `ws show` in commands and references. The optional \
         `apps[].name` is a display label.
         Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
@@ -302,6 +303,8 @@ extension GuideCommand {
         silta --ws acme task block AC-12 --on ext:acme -m 'Need the identity provider callback \
         URL.'
         ```
+        Use --off <ref> to remove a current blocker. Add its replacement with --on in the same \
+        command. Making an unready block ready requires the human's approval.
         Silta sends nothing: tell the human exactly what to ask whom, then pick other work. \
         Never unblock with open blockers without the human's approval, and never put "waiting \
         for" into repo files or plans.

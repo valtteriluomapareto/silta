@@ -1,0 +1,288 @@
+import Foundation
+import GRDB
+import SiltaCore
+import SiltaTestSupport
+import Testing
+
+@Suite(.blockingTestWork, .timeLimit(.minutes(2)))
+struct TaskBlockReplacementCommandTests {
+  @Test func swapChecksOnlyTheFinalBlockerSet() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let result = try run(
+        [
+          "task", "block", "AC-1", "--off", "ext:old", "--on", "ext:new",
+          "--follow-up", "3d", "-m", "Ask the new Acme party",
+        ], scratch)
+      let data = try TaskStateCommandTests.data(result)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(waiting["on"] as? [String] == ["ext:new", "task:AC-2"])
+      #expect(waiting["ready"] as? Bool == false)
+      #expect(waiting["why"] as? String == "Ask the new Acme party")
+      #expect(data["follow_up_at"] as? String == "2023-11-17")
+      #expect(result.stdout.contains("new_party"))
+      #expect(try approvals(store).isEmpty)
+      let shown = try run(["task", "show", "AC-1", "--timeline"], scratch)
+      let detail = try TaskStateCommandTests.data(shown)
+      let events = try #require(detail["timeline"] as? [[String: Any]])
+      let event = try #require(events.last(where: { $0["kind"] as? String == "block" }))
+      #expect((event["body"] as? String)?.contains(#""on":["ext:new","task:AC-2"]"#) == true)
+    }
+  }
+
+  @Test func makingABlockReadyRequiresAnActuallyUsedApproval() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let show = ["task", "show", "AC-1", "--timeline"]
+      let before = try run(show, scratch)
+      let reason = "Acme is no longer waiting on the party"
+      let refused = try run(
+        ["task", "block", "AC-1", "--off", "ext:old", "--follow-up", "3d", "-m", reason],
+        scratch)
+      let error = try TaskStateCommandTests.error(refused)
+      #expect(refused.termination == .exit(3))
+      #expect(error["code"] as? String == "human_only")
+      #expect(error["next_by"] as? String == "human")
+      #expect((error["message"] as? String)?.contains("ext:old") == true)
+      #expect((error["message"] as? String)?.contains("ready") == true)
+      #expect(!refused.stdout.contains(reason))
+      #expect(try run(show, scratch) == before)
+      #expect(try approvals(store).isEmpty)
+      let next = try #require(error["next"] as? [String])
+      let command = try #require(next.first)
+      #expect(command.hasPrefix("silta --ws 'acme' task block 'AC-1' --off 'ext:old'"))
+      #expect(command.contains("--follow-up '3d' -F - "))
+
+      let retry = try approvedRetry(command, reason: reason, scratch: scratch)
+      let data = try TaskStateCommandTests.data(retry)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(data["status"] as? String == "blocked")
+      #expect(waiting["ready"] as? Bool == true)
+      #expect(waiting["on"] as? [String] == ["task:AC-2"])
+      #expect(!retry.stdout.contains("approval_unused"))
+      let audit = try approvals(store)
+      #expect(audit.count == 1 && audit.first?.contains("--off 'ext:old'") == true)
+      #expect(audit.first?.contains(reason) == false)
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func emptyBlockIsUnreadyAndTerminalBlockerCanBeRemoved(dropped: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try setup(scratch, dropped: dropped)
+      let result = try run(
+        [
+          "task", "block", "AC-1", "--off", "ext:old", "AC-2", "--off", "task:AC-2",
+          "--follow-up", "3d", "-m", "Wait for the Acme answer",
+        ], scratch)
+      let data = try TaskStateCommandTests.data(result)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(waiting["on"] as? [String] == [])
+      #expect(waiting["ready"] as? Bool == false)
+      #expect(data["status"] as? String == "blocked")
+      let unblock = try run(["task", "unblock", "AC-1"], scratch)
+      #expect(try TaskStateCommandTests.error(unblock)["code"] as? String == "human_only")
+      let before = try inbox(at: "2023-11-16T23:59:59.998Z", scratch: scratch)
+      let due = try inbox(at: "2023-11-17T00:00:00.000Z", scratch: scratch)
+      #expect(before.isEmpty)
+      #expect(due.first?["kind"] as? String == "due")
+    }
+  }
+
+  @Test func readinessAndSecretRetentionRecordOneApproval() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let result = try run(
+        [
+          "task", "block", "AC-1", "--off", "ext:old", "--allow-secret",
+          "--approved", "Accept the Acme correction.", "-m", "Pwd=acme-synthetic-value",
+        ],
+        scratch)
+      let data = try TaskStateCommandTests.data(result)
+      #expect((data["waiting"] as? [String: Any])?["ready"] as? Bool == true)
+      #expect(!result.stdout.contains("approval_unused"))
+      #expect(!result.stdout.contains("acme-synthetic-value"))
+      let audit = try approvals(store)
+      #expect(audit.count == 1 && audit.first?.contains("--allow-secret") == true)
+      #expect(audit.first?.contains("acme-synthetic-value") == false)
+    }
+  }
+
+  @Test func namedFileApprovalRetriesKeepTheCapturedWorkspaceAndHideInput() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let body = scratch.appending(path: "private-reason.txt")
+      let reason = "Acme private correction"
+      try reason.write(to: body, atomically: true, encoding: .utf8)
+      let arguments = ["task", "block", "AC-1", "--off", "ext:old"]
+      let readiness = try run(arguments + ["-F", body.path], scratch)
+      let secret = try run(
+        arguments + ["--allow-secret", "-F", body.path + ".missing"], scratch)
+      for (result, allowFlag) in [(readiness, ""), (secret, " --allow-secret")] {
+        let error = try TaskStateCommandTests.error(result)
+        #expect(result.termination == .exit(3))
+        #expect(error["next_by"] as? String == "human")
+        #expect(
+          error["next"] as? [String] == [
+            "silta --ws 'acme' task block 'AC-1' --off 'ext:old'\(allowFlag) -F <file>"
+              + " --approved \"<the human's words>\""
+          ])
+        #expect(!result.stdout.contains(body.path) && !result.stdout.contains(reason))
+      }
+      #expect(try approvals(store).isEmpty)
+    }
+  }
+
+  @Test func invalidRemovalLeavesTheOriginalBlock() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      try success(["task", "add", "Acme active", "--start"], scratch)
+      try success(["task", "block", "AC-1", "--on", "AC-3", "-m", "Another blocker"], scratch)
+      let show = ["task", "show", "AC-1", "--timeline"]
+      let before = try run(show, scratch)
+      for args in [
+        ["AC-1", "--off", "ext:old", "ext:absent"],
+        ["AC-1", "--off", "ext:old", "--on", "ext:old"],
+        ["AC-1", "--off", "AC-3", "--on", "task:AC-3"],
+        ["AC-3", "--off", "ext:old"],
+      ] {
+        let result = try run(["task", "block"] + args + ["-m", "Acme correction"], scratch)
+        let error = try TaskStateCommandTests.error(result)
+        #expect(error["code"] as? String == "invalid")
+        if args.contains("ext:absent") {
+          #expect((error["message"] as? String)?.contains("ext:old") == true)
+          #expect(error["next"] as? [String] == ["silta --ws 'acme' task show 'AC-1'"])
+        }
+      }
+      #expect(try run(show, scratch) == before)
+      #expect(try approvals(store).isEmpty)
+    }
+  }
+
+}
+
+extension TaskBlockReplacementCommandTests {
+  @Test func removingAnUnanchoredBlockerPreservesAnImportedAnchoredTwin() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE link SET anchor='#legacy' WHERE rel='blocked_by' AND to_kind='ext';
+            INSERT INTO link(
+              uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at)
+            SELECT 'acme-unanchored',workspace_id,from_kind,from_id,rel,to_kind,to_ext,
+              created_by,created_at FROM link WHERE rel='blocked_by' AND to_kind='ext';
+            """)
+      }
+      let remove = ["task", "block", "AC-1", "--off", "ext:old", "-m", "Acme correction"]
+      try success(remove, scratch)
+      #expect(
+        try store.read {
+          try String.fetchAll(
+            $0, sql: "SELECT anchor FROM link WHERE rel='blocked_by' AND to_kind='ext'")
+        } == ["#legacy"])
+      let repeatRemoval = try run(remove, scratch)
+      #expect(try TaskStateCommandTests.error(repeatRemoval)["code"] as? String == "invalid")
+    }
+  }
+
+  @Test func urlRemovalUsesExactStoredBytes() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let prefix = "url:https://example.invalid/"
+      let composed = prefix + "\u{e9}"
+      let decomposed = prefix + "e\u{301}"
+      try store.write {
+        for (index, reference) in [composed, decomposed].enumerated() {
+          try $0.database.execute(
+            sql: """
+              INSERT INTO link(
+                uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at)
+              SELECT ?,workspace_id,from_kind,from_id,rel,'url',CAST(? AS TEXT),
+                created_by,created_at
+              FROM link WHERE rel='blocked_by' AND to_kind='ext';
+              """, arguments: ["acme-url-\(index)", Data(reference.dropFirst(4).utf8)])
+        }
+      }
+      try success(["task", "block", "AC-1", "--off", decomposed, "-m", "Remove one URL."], scratch)
+      let urls = try store.read {
+        try Data.fetchAll($0, sql: "SELECT CAST(to_ext AS BLOB) FROM link WHERE to_kind='url'")
+      }
+      #expect(urls == [Data(composed.dropFirst(4).utf8)])
+    }
+  }
+
+  @Test func retainedSecretBlockerStaysOutOfRecoveryAndAudit() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let secret = "url:https://example.invalid/?pwd=acme-synthetic-value"
+      let block = ["task", "block", "AC-1"]
+      try success(
+        block + [
+          "--off", "ext:old", "--on", secret, "--allow-secret",
+          "--approved", "Record the Acme URL.", "-m", "Waiting on Acme.",
+        ], scratch)
+      let remove = block + ["--off", secret, "-m", "Acme resolved the URL."]
+      let refusal = try run(remove, scratch)
+      let message = try TaskStateCommandTests.error(refusal)
+      let commands = try #require(message["next"] as? [String])
+      #expect(refusal.termination == .exit(3))
+      #expect(commands.first?.contains("--off '<blocker-ref>'") == true)
+      #expect(!refusal.stdout.contains("acme-synthetic-value"))
+      try success(remove + ["--approved", "Remove the Acme URLs."], scratch)
+      let audit = try approvals(store)
+      #expect(audit.count == 2 && audit.last?.contains("--off '<blocker-ref>'") == true)
+      #expect(audit.allSatisfy { !$0.contains("acme-synthetic-value") })
+    }
+  }
+
+  private func setup(_ scratch: URL, dropped: Bool = false) throws -> DatabaseStore {
+    let store = try TaskCommandTests.setup(scratch)
+    for title in ["Acme waiting", "Acme dependency"] {
+      try success(["task", "add", title, "--start"], scratch)
+    }
+    try success(
+      ["task", "block", "AC-1", "--on", "AC-2", "ext:old", "-m", "Old Acme reason"], scratch)
+    try success(
+      ["task", dropped ? "drop" : "done", "AC-2", "-m", "Acme dependency settled"], scratch)
+    return store
+  }
+
+  private func approvals(_ store: DatabaseStore) throws -> [String] {
+    try store.read { try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id") }
+  }
+
+  private func inbox(at time: String, scratch: URL) throws -> [[String: Any]] {
+    let result = try SiltaBinary.run(
+      ["inbox", "--for", "me", "--json"], in: scratch,
+      environment: TaskBlockCommandTests.environment.merging(["USER": "acme", "SILTA_NOW": time]) {
+        $1
+      })
+    return try #require(TaskStateCommandTests.data(result)["items"] as? [[String: Any]])
+  }
+
+  private func run(_ args: [String], _ scratch: URL) throws -> CLIResult {
+    try SiltaBinary.run(
+      args + ["--deterministic", "--json"], in: scratch,
+      environment: TaskBlockCommandTests.environment)
+  }
+
+  private func success(_ args: [String], _ scratch: URL) throws {
+    let result = try run(args, scratch)
+    try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+  }
+
+  private func approvedRetry(_ command: String, reason: String, scratch: URL) throws -> CLIResult {
+    let body = scratch.appending(path: "reason.txt")
+    try reason.write(to: body, atomically: true, encoding: .utf8)
+    let shell =
+      command
+      .replacingOccurrences(of: "silta ", with: shellWord(try SiltaBinary.url().path) + " ")
+      .replacingOccurrences(of: "<the human's words>", with: "Accept the Acme correction.")
+      + " --deterministic --json < " + shellWord(body.path)
+    return try SiltaBinary.runProcess(
+      URL(filePath: "/bin/sh"), ["-ec", shell], in: scratch,
+      environment: TaskBlockCommandTests.environment)
+  }
+}

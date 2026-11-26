@@ -4,7 +4,7 @@ import GRDB
 /// Lightweight SQL selection: topic membership is one hop and limits precede row decoding.
 struct BriefBacklog {
   let db: Database
-  let location: LocationResult
+  let location: BriefLocation
   let actor: ActorID
   let date: Date
   let archiveDays: Int
@@ -29,7 +29,8 @@ struct BriefBacklog {
         """, arguments: arguments)
     let topics = explicit.union(inferred)
     let aliases = try topicRows(topics, workspace: workspace)
-    let scope = "(app.slug=:app OR \(topicMatch(topics)))"
+    let workspaceWide = location.git == nil && explicit.isEmpty
+    let scope = workspaceWide ? "1=1" : "(app.slug=:app OR \(topicMatch(topics)))"
     let unreadable = try TaskVisibility.unreadableDates(
       scope: "task.workspace_id=:workspace AND \(scope)",
       arguments: arguments, in: db)
@@ -156,6 +157,7 @@ struct BriefBacklog {
 
   private func listCommands(rows: [Row]) -> [String] {
     let command = "silta --ws " + shellWord(location.workspace) + " task ls"
+    if location.git == nil, rows.isEmpty { return [command] }
     var commands = location.app.map { [command + " --app " + shellWord($0)] } ?? []
     let slugs = rows.map { $0["slug"] as String }
     for slug in Set(slugs).sorted() { commands.append(command + " --topic " + shellWord(slug)) }

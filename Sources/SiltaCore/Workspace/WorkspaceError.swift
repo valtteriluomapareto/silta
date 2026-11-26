@@ -23,7 +23,8 @@ package enum WorkspaceError: CodedError {
 
   /// Removing a configured row would break an existing reference.
   case conflict
-  case removalBlockers(workspace: String, details: [String], hasDocuments: Bool)
+  case removalBlockers(
+    workspace: String, details: [String], hasDocuments: Bool, taskRefs: [String])
 
   /// Removing a map item would detach current accepted knowledge.
   case docAttachments(
@@ -61,7 +62,7 @@ package enum WorkspaceError: CodedError {
       "This repository belongs to several workspaces. "
         + "Retry the original command with --ws and a workspace from the candidates."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
-    case .removalBlockers(_, let details, _):
+    case .removalBlockers(_, let details, _, _):
       "Workspace removal blocked by " + details.joined(separator: "; ") + "."
     case .docAttachments(_, let item, let docs, _, _):
       "Cannot remove \(TaskError.shown(DocService.about([item]))); attached docs: "
@@ -78,16 +79,26 @@ package enum WorkspaceError: CodedError {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
     case .docAttachments(_, _, _, let commands, _): commands
-    case .removalBlockers(let workspace, _, let hasDocuments):
-      hasDocuments && RestoreService.canNameInRecovery(workspace)
-        ? [workspaceCommand("silta doc ls", workspace: workspace), workspaceEditRead(workspace)]
-        : [workspaceEditRead(workspace)]
+    case .removalBlockers(let workspace, _, let hasDocuments, let taskRefs):
+      removalRecovery(workspace: workspace, hasDocuments: hasDocuments, taskRefs: taskRefs)
     case .notFound, .unknown: ["silta ws ls"]
     case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .invalid(_, true): ["silta ws edit --help"]
     case .input: ["silta ws edit -F <file>"]
     default: ["silta ws edit"]
     }
+  }
+
+  private func removalRecovery(
+    workspace: String, hasDocuments: Bool, taskRefs: [String]
+  ) -> [String] {
+    let view = workspaceEditRead(workspace)
+    guard RestoreService.canNameInRecovery(workspace) else { return [view] }
+    let tasks = taskRefs.filter(RestoreService.canNameInRecovery).prefix(3).map {
+      workspaceCommand("silta task show " + shellWord($0), workspace: workspace)
+    }
+    let docs = hasDocuments ? [workspaceCommand("silta doc ls", workspace: workspace)] : []
+    return tasks + docs + [view]
   }
 
   /// Follows the prepared recovery action; protected read hubs remain agent-owned.

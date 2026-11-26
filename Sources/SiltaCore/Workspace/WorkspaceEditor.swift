@@ -276,8 +276,7 @@ extension WorkspaceEditor {
         } catch let error as WorkspaceError {
           guard !unchanged else { throw unchangedFailure(error, baseline: baseline) }
           rejected = (changed, error)
-          let annotated =
-            "# " + error.message.replacingOccurrences(of: "; ", with: "\n# ") + "\n" + text
+          let annotated = rejectedDraft(text, error: error)
           content = stamp == nil ? annotated : baseline.stamped(annotated)
         }
       }
@@ -307,9 +306,16 @@ extension WorkspaceEditor {
   }
 
   private static func unchangedFailure(_ error: WorkspaceError, baseline: Baseline)
-    -> CommandFailure
+    -> any CodedError
   {
-    CommandFailure(error: error, next: [workspaceEditRead(baseline.slug)], nextBy: .agent)
+    if case .removalBlockers = error { return error }
+    return CommandFailure(error: error, next: [workspaceEditRead(baseline.slug)], nextBy: .agent)
+  }
+
+  private static func rejectedDraft(_ text: String, error: WorkspaceError) -> String {
+    let header = "# " + error.message.replacingOccurrences(of: "; ", with: "\n# ") + "\n"
+    guard case .removalBlockers = error else { return header + text }
+    return header + error.next.map { "# next: " + $0 + "\n" }.joined() + text
   }
 
   private static func checkSlug(_ config: WorkspaceConfig, baseline: Baseline) throws {

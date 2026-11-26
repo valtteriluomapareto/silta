@@ -191,4 +191,30 @@ package struct LocationService {
       ?? ("silta init --scan " + shellWord(path.path))
     return CommandFailure(error: LocationError.unregistered, next: [next])
   }
+
+  /// Points a command outside Git toward the workspace brief for that directory.
+  package func outsideGitFailure(
+    workspace: String? = nil, path: URL? = nil, briefArguments: String? = ""
+  ) throws -> any CodedError {
+    let slugs = try WorkspaceSelection.list(in: environment.db).map(\.slug)
+    guard !slugs.isEmpty else { return LocationError.outsideRepository }
+    let message = "This path is outside Git. Read a workspace brief from that directory."
+    guard let briefArguments,
+      path.map({ RestoreService.canNameInRecovery($0.path) }) != false
+    else {
+      return CommandFailure(
+        error: LocationError.outsideRepository, next: ["silta ws ls"],
+        message: message)
+    }
+    let choices = workspace.flatMap { slugs.contains($0) ? [$0] : nil } ?? slugs
+    let safeSlugs = choices.filter(RestoreService.canNameInRecovery)
+    let changeDirectory = path.map { "cd " + shellWord($0.path) + " && " } ?? ""
+    let next =
+      safeSlugs.prefix(3).map {
+        changeDirectory + workspaceCommand("silta brief" + briefArguments, workspace: $0)
+      } + (safeSlugs.count > 3 || safeSlugs.isEmpty ? ["silta ws ls"] : [])
+    return CommandFailure(
+      error: LocationError.outsideRepository, next: next,
+      message: message)
+  }
 }

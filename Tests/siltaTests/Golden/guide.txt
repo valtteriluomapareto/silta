@@ -4,6 +4,7 @@ Use Silta for cross-repo work, another app or backend, branch-as-app repos, plan
 # Session start
 If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta --ws acme brief --task AC-12`, then `silta --ws acme task start AC-12`. Replace acme with the workspace from your brief. Text is the default; use --json only to parse output.
 Workspace commands use --ws, then the registered repository here, then the default from `ws use` outside registered repositories. Commands here follow the workspace in `brief`; use --ws for intentional cross-workspace work. Inference never saves a selection. For several matching workspaces, inspect the scoped candidates and retry with --ws.
+Outside Git, run `silta --ws acme brief` for workspace context or use the saved default.
 Use the app `slug` from `ws show` in commands and references. The optional `apps[].name` is a display label.
 Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
 For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.
@@ -79,6 +80,7 @@ Leave a handoff before blocking; blocking releases any remaining claim.
 silta --ws acme comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'
 silta --ws acme task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'
 ```
+Use --off <ref> to remove a current blocker. Add its replacement with --on in the same command. Making an unready block ready requires the human's approval.
 Silta sends nothing: tell the human exactly what to ask whom, then pick other work. Never unblock with open blockers without the human's approval, and never put "waiting for" into repo files or plans.
 
 # Handoff

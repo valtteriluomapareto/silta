@@ -12,7 +12,7 @@ struct TaskGit: Sendable {
 
   static func inspect(
     repo: String?, directory: URL, runner: any GitRunner,
-    enabled: Bool, completion: Bool, sha: String? = nil
+    enabled: Bool, completion: Bool, sha: String? = nil, classifyOutsideRepository: Bool = false
   ) async throws -> TaskGit {
     guard enabled else { return TaskGit() }
     guard let repo, FileManager.default.fileExists(atPath: repo + "/.git") else {
@@ -21,7 +21,9 @@ struct TaskGit: Sendable {
     let registered = URL(filePath: repo, directoryHint: .isDirectory)
     let identityArgs = ["rev-parse", "--path-format=absolute", "--git-common-dir"]
     let expected = try await value(identityArgs, directory: registered, runner: runner)
-    let actual = try await value(identityArgs, directory: directory, runner: runner)
+    let actual = try await value(
+      identityArgs, directory: directory, runner: runner,
+      classifyOutsideRepository: classifyOutsideRepository)
     guard
       URL(filePath: actual).resolvingSymlinksInPath().path
         == URL(filePath: expected).resolvingSymlinksInPath().path
@@ -73,15 +75,22 @@ struct TaskGit: Sendable {
   }
 
   private static func value(
-    _ arguments: [String], directory: URL, runner: any GitRunner
+    _ arguments: [String], directory: URL, runner: any GitRunner,
+    classifyOutsideRepository: Bool = false
   ) async throws -> String {
+    let result: GitResult
     do {
-      let result = try await runner.run(.init(arguments: arguments, directory: directory))
-      guard result.termination == .exit(0), let text = String(data: result.stdout, encoding: .utf8)
-      else { throw TaskError.git }
-      return text.trimmingCharacters(in: .newlines)
+      result = try await runner.run(.init(arguments: arguments, directory: directory))
     } catch {
       throw TaskError.git
     }
+    guard result.termination == .exit(0), let text = String(data: result.stdout, encoding: .utf8)
+    else {
+      if classifyOutsideRepository, LocationGit.isOutsideRepository(result, at: directory) {
+        throw TaskError.foreignRepo
+      }
+      throw TaskError.git
+    }
+    return text.trimmingCharacters(in: .newlines)
   }
 }

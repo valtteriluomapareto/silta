@@ -505,10 +505,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
   `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
   `distance`, `non_app_ref`, `shallow` or `unresolved`.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
-- Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
-  help, without suggesting a scan of the input directory. An unregistered Git
-  repository gets a scan command for its canonical toplevel. With an explicit
-  existing workspace, the unregistered result points to that workspace's YAML.
+- Outside Git, `where` returns `unregistered`. If workspaces exist it prints
+  scoped `brief` retries, preserving the inspected directory when `--path` was
+  supplied. With no workspaces it points to help. An unregistered Git repository
+  gets a scan command for its canonical toplevel. With an explicit existing
+  workspace, the unregistered result points to that workspace's YAML.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
@@ -630,6 +631,11 @@ going until the list is empty or the human stops it.
   `doing`, `claimed_by`, `claimed_at`, `branch` and `worktree` in one
   `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
   app.
+- For an app task started outside Git or from an unrelated repository, `invalid`
+  gives a workspace-scoped retry from the registered clone. Run later task commands
+  from the same worktree so they use the same session. Check any recorded worktree
+  before resuming. The retry preserves an explicit `--steal` and uses a placeholder
+  for approval words when needed. A failed Git probe or broken clone stays `env`.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
   the holder and the age. For an agent, `next` is `silta task ls --status todo`, to
   pick other work, and the message names the exact `silta --ws <workspace> task start
@@ -701,7 +707,7 @@ subtask of an app task non-code, and no app slug may be `none`.
 
 **Blockers and dependencies (D35).** A task can wait on another task, on an outside
 party (a customer, an app store), or on something at a URL such as a tracker item.
-- `task block AC-12 [--on <ref>…] [--follow-up <date>|<n>d] -m <why>`:
+- `task block AC-12 [--on <ref>…] [--off <ref>…] [--follow-up <date>|<n>d] -m <why>`:
   - Allowed from `todo`, `doing` and `review`. It sets `blocked` and releases the
     claim.
   - Each `--on` records a `blocked_by` link to an open task in the same workspace
@@ -713,8 +719,14 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   - `--follow-up` is the day to look again, as a UTC day (not the local one), and
     never in the past; it defaults to 7 days. So nothing stays blocked unnoticed,
     cycles included.
-  - On a task that is already blocked, `block` adds blockers and replaces the
-    follow-up day and the reason, which is how a chase is snoozed.
+  - On a task that is already blocked, `--on` adds blockers and `--off` removes
+    named current blockers. A completed or dropped task can be removed. A
+    replacement uses both options in one write. An identity listed in both is
+    invalid, and a missing current blocker leaves the whole edit unapplied.
+    The command replaces the reason and follow-up day with the supplied values.
+  - Turning an unready block into a ready one requires the human's go-ahead.
+    Readiness uses the final set. The task stays blocked. An empty set waits for
+    an answer and comes due on its follow-up day.
   - Each `block` writes a `block` event whose body is JSON:
     `{"on":[…],"follow_up":"<day>","why":"<-m>"}`, where `on` holds task uids and
     `ext:`/`url:` strings. `ls` and `show` print the latest `why`; `show --timeline`
@@ -765,6 +777,14 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `task start` to address review findings (D41).
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
+- `task unlink AC-12 <map-ref> [--rel <relation>]` removes one exact, unanchored map
+  link shown by `task show`. It accepts app and topic targets and retained legacy
+  edge and service targets. The relations are `cites` (default), `about`, `source`
+  and `relates`. Claim and promoted-task rules apply even when the task is closed
+  or archived. A successful removal records a `field` event with body
+  `unlinked <relation> <target>`. JSON includes `ref`, `status` and `removed`.
+  An absent link to an existing target returns `removed: false` without changing
+  the task or its history.
 - **Receipts say what changed:** `AC-5 archived`, `AC-5 kept`, `AC-14 linked cites
   task:AC-2` (the target as `show` prints it), `AC-5 promoted to ado:4711; read-only
   here`, `AC-5 edited: title, plan` (or `AC-5 unchanged`). Their `--json` data stays
@@ -1607,6 +1627,15 @@ workspace. A setting that changes the rules gets one conditional sentence, and
 silta brief [--task AC-12] [--app <slug>] [--topic <slug>…] [--budget 2500] [--short] [--hook] [--json]
 ```
 
+Outside Git, `brief` uses an explicit `--ws` or the workspace saved by `ws use`.
+It shows workspace settings, inbox and backlog. `--task` and `--topic` select
+workspace context. `--app` requires a repository candidate. With no workspace
+selection, `brief` gives scoped retry commands when workspaces are available.
+The JSON location has reason `workspace_only`, low app confidence, an empty
+string for `repo` and null `app` and `branch`. The installed SessionStart hook
+stays silent outside Git. An explicit `silta --ws acme brief --hook` can request
+the bounded workspace brief.
+
 The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 `--hook` use about 800. Sections come in this order, each trimmed to fit:
 
@@ -1688,6 +1717,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    aliases. Their matching tasks may belong to other apps; duplicates appear once,
    and topics do not expand recursively. An unknown topic returns `not_found` with
    a workspace-qualified `ws show` command. The current task may also appear here.
+   A workspace-only brief includes tasks across the workspace, filtered by
+   `--topic` when supplied.
 7. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
    matching tasks, ordered by completion instant then task sequence descending.
    Empty result text is omitted. Cross-app open rows name their app.
@@ -2260,6 +2291,7 @@ silta task triage
 silta task archive
 silta task keep
 silta task link
+silta task unlink
 silta task promote
 silta task diff [M2]
 silta task review [M2]
@@ -3144,8 +3176,12 @@ entries, each with a topic ref, normalized additions and exact stored removals. 
 these optional fields when they are empty. Use the preview before requesting approval.
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
-item and its docs. Proposal-only or archived docs and `cites` links do not pin map
+item and its docs. Proposal-only or archived docs and document `cites` links do not pin map
 items; removing an item cleans its non-pinning doc links in the same transaction.
+Task map links and primary app assignments also pin items. A task conflict points
+to `task show` for inspecting the exact link or assignment. Use `task unlink` for
+the displayed relation. Independent app assignments and links on promoted tasks
+retain their protection.
 New app identities cannot use `doc`, `edge` or `service`; retained identities and
 faithful restore preserve those names. Their generic code refs require `code:`.
 New service slugs and edge kinds must be identifiers (letters/digits with internal
