@@ -94,10 +94,8 @@ struct GuideRecipeTests {
       let result = try fixture.execute(firstCodeRead(fixture), task: "AC-1")
       try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
       let data = try code.envelope(result.stdout)
-      withKnownIssue("SI-266: the guide reads the cached ref without fetching") {
-        #expect(data["sha"] as? String == refreshed)
-        #expect(data["output"] as? String == "README.md:1:Acme refreshed console\n")
-      }
+      #expect(data["sha"] as? String == refreshed)
+      #expect(data["output"] as? String == "README.md:1:Acme refreshed console\n")
     }
   }
 
@@ -112,17 +110,15 @@ struct GuideRecipeTests {
         ["remote", "set-url", "origin", scratch.appending(path: "missing-origin").path],
         fixture.repo, scratch)
       let failed = try fixture.execute(firstCodeRead(fixture), task: "AC-1")
-      withKnownIssue("SI-266: the guide does not give the fetch failure and cached retry") {
-        try #require(failed.termination == .exit(9), "\(failed.stdout)\(failed.stderr)")
-        let root = try GuideContractTests.object(failed.stdout)
-        let error = try #require(root["error"] as? [String: Any])
-        #expect(error["next_by"] as? String == "agent")
-        let next = try #require((error["next"] as? [String])?.first)
-        let retry = try fixture.execute(jsonCodeRead(next), task: "AC-1")
-        try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
-        #expect(try code.envelope(retry.stdout)["sha"] as? String == cached)
-        #expect(try code.warnings(retry.stdout)["ref_stale"] != nil)
-      }
+      try #require(failed.termination == .exit(9), "\(failed.stdout)\(failed.stderr)")
+      let root = try GuideContractTests.object(failed.stdout)
+      let error = try #require(root["error"] as? [String: Any])
+      #expect(error["next_by"] as? String == "agent")
+      let next = try #require((error["next"] as? [String])?.first)
+      let retry = try fixture.execute(jsonCodeRead(next), task: "AC-1")
+      try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
+      #expect(try code.envelope(retry.stdout)["sha"] as? String == cached)
+      #expect(try code.warnings(retry.stdout)["ref_stale"] != nil)
     }
   }
 

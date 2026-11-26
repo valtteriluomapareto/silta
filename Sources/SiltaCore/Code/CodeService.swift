@@ -258,14 +258,21 @@ package struct CodeService {
   private func stale(_ selection: Selection)
     -> [OutputWarning]
   {
-    let hint =
-      "run silta --ws \(shellWord(workspace)) repo fetch \(shellWord(selection.repo)) (needs network)."
-    guard let text = selection.fetched,
-      let fetched = try? Date(text, strategy: .iso8601)  // invalid means unknown
-    else { return [.init(code: "ref_stale", message: "No fetch recorded; " + hint)] }
-    let age = date.timeIntervalSince(fetched)
-    guard age >= 86_400 else { return [] }
-    return [.init(code: "ref_stale", message: "fetched \(Int(age / 3600)) h ago; " + hint)]
+    let status: String
+    if let text = selection.fetched,
+      let fetched = try? Date(text, strategy: .iso8601)  // Invalid means unknown.
+    {
+      let age = date.timeIntervalSince(fetched)
+      guard age >= 86_400 else { return [] }
+      status = "Last fetch was \(Int(age / 3600)) h ago."
+    } else {
+      status = "No fetch recorded."
+    }
+    let fetch = "silta --ws \(shellWord(workspace)) repo fetch \(shellWord(selection.repo))"
+    let recovery =
+      "For current remote code, run \(fetch) once this session, then repeat the read. "
+      + "If fetching fails, report the cached SHA with freshness unverified."
+    return [.init(code: "ref_stale", message: status + " " + recovery)]
   }
 }
 
