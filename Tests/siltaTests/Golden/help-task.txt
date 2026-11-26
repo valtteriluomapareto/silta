@@ -38,6 +38,7 @@ SUBCOMMANDS:
   keep                    Keep a task visible regardless of its closed age.
   link                    Link a task to a reference in this workspace or an
                           external URL.
+  unlink                  Remove one task link to a workspace map item.
   promote                 Record an external tracker and make the task
                           read-only (human-only).
   block                   Record blockers; Silta sends nothing.
@@ -509,5 +510,32 @@ OPTIONS:
                           none.
   --allow-secret          Retain detected secrets (human-only; use file input
                           for a body retry).
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta task unlink
+
+OVERVIEW: Remove one task link to a workspace map item.
+
+Use the exact relation and target shown by task show. Removing an absent link
+succeeds with removed=false. Blockers belong to task block.
+Remove an Acme map link: silta task unlink AC-1 app:api --rel about
+
+USAGE: silta task unlink [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> <target> [--rel <rel>]
+
+ARGUMENTS:
+  <ref>                   The source task reference.
+  <target>                The app, topic, edge or service reference.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --rel <rel>             The link relation. (default: cites)
   --version               Show the version.
   -h, --help              Show help information.

@@ -31,40 +31,28 @@ struct TaskMapUnlinkCommandTests {
       let blocked = try run(edit, scratch)
       #expect(try TaskStateCommandTests.error(blocked)["code"] as? String == "conflict")
 
-      withKnownIssue("SI-86: task links block map edits without supported unlink recovery") {
-        let error = try TaskStateCommandTests.error(blocked)
-        let next = try #require(error["next"] as? [String])
-        #expect(next.contains("silta --ws 'acme' task show 'AC-1'"))
-        #expect(next.allSatisfy { !$0.contains("task unlink") })
-        let shown = try run(["task", "show", "AC-1"], scratch)
-        #expect(shown.stdout.contains("about: app:api"))
-        let first = try run(
-          ["task", "unlink", "AC-1", "app:api", "--rel", "about", "--json"], scratch)
-        try #require(first.termination == .exit(0), "\(first.stdout)\(first.stderr)")
-        Golden.forTests().check(first.stdout, "task-unlink.json")
-        #expect(try identities(store) == before.filter { $0 != "task|1|about|app|1" })
-        let audit = try changeState(store)
-        let repeated = try run(
-          ["task", "unlink", "AC-1", "app:api", "--rel", "about"],
-          scratch, now: "2023-11-15T22:13:20.000Z")
-        #expect(repeated.termination == .exit(0))
-        #expect(repeated.stdout.contains("no matching"))
-        #expect(try changeState(store) == audit)
-        #expect(try run(edit, scratch).termination == .exit(6))
+      let error = try TaskStateCommandTests.error(blocked)
+      let next = try #require(error["next"] as? [String])
+      #expect(next.contains("silta --ws 'acme' task show 'AC-1'"))
+      #expect(next.allSatisfy { !$0.contains("task unlink") })
+      let shown = try run(["task", "show", "AC-1"], scratch)
+      #expect(shown.stdout.contains("about: app:api"))
+      let first = try run(
+        ["task", "unlink", "AC-1", "app:api", "--rel", "about", "--json"], scratch)
+      try #require(first.termination == .exit(0), "\(first.stdout)\(first.stderr)")
+      Golden.forTests().check(first.stdout, "task-unlink.json")
+      #expect(try identities(store) == before.filter { $0 != "task|1|about|app|1" })
+      let audit = try changeState(store)
+      let repeated = try run(
+        ["task", "unlink", "AC-1", "app:api", "--rel", "about"],
+        scratch, now: "2023-11-15T22:13:20.000Z")
+      #expect(repeated.termination == .exit(0))
+      #expect(repeated.stdout.contains("no matching"))
+      #expect(try changeState(store) == audit)
+      #expect(try run(edit, scratch).termination == .exit(6))
 
-        try success(["task", "unlink", "AC-1", "app:api"], scratch)
-        try success(["task", "unlink", "AC-2", "app:api", "--rel", "about"], scratch)
-        #expect(try run(edit, scratch).termination == .exit(6))
-        try success(["doc", "archive", "rules", "--approved", "Archive the Acme rules."], scratch)
-        let assignment = try run(edit, scratch)
-        #expect(assignment.termination == .exit(6))
-        #expect(assignment.stdout.contains("AC-3"))
-        try success(
-          ["task", "edit", "AC-3", "--app", "none", "--approved", "Unassign the Acme app."],
-          scratch)
-        try success(edit, scratch)
-        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM app") } == 1)
-      }
+      try releaseRemainingPins(andApply: edit, in: scratch)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM app") } == 1)
     }
   }
 
@@ -77,7 +65,8 @@ struct TaskMapUnlinkCommandTests {
           sql: """
             UPDATE service SET slug='push/legacy %雪';
             UPDATE edge SET kind='HTTP/API %2F 雪';
-            INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+            INSERT INTO link(
+              uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
               VALUES('old-service',1,'task',1,'cites','service',1,'human:acme',''),
                     ('old-edge',1,'task',1,'cites','edge',1,'human:acme','');
             """)
@@ -86,15 +75,27 @@ struct TaskMapUnlinkCommandTests {
       let data = try GuideContractTests.data(shown)
       let links = try #require(data["links"] as? [[String: String]])
       try #require(links.count == 2)
-      withKnownIssue("SI-86: there is no way to remove retained legacy map links") {
-        for link in links {
-          let target = try #require(link["target"])
-          #expect(target.contains("%2F"))
-          try success(["task", "unlink", "AC-1", target], scratch)
-        }
-        #expect(try identities(store).isEmpty)
+      for link in links {
+        let target = try #require(link["target"])
+        #expect(target.contains("%2F"))
+        try success(["task", "unlink", "AC-1", target], scratch)
       }
+      #expect(try identities(store).isEmpty)
     }
+  }
+
+  private func releaseRemainingPins(andApply edit: [String], in scratch: URL) throws {
+    try success(["task", "unlink", "AC-1", "app:api"], scratch)
+    try success(["task", "unlink", "AC-2", "app:api", "--rel", "about"], scratch)
+    #expect(try run(edit, scratch).termination == .exit(6))
+    try success(["doc", "archive", "rules", "--approved", "Archive the Acme rules."], scratch)
+    let assignment = try run(edit, scratch)
+    #expect(assignment.termination == .exit(6))
+    #expect(assignment.stdout.contains("AC-3"))
+    try success(
+      ["task", "edit", "AC-3", "--app", "none", "--approved", "Unassign the Acme app."],
+      scratch)
+    try success(edit, scratch)
   }
 
   @Test func guardedRequestsLeaveTheMapLinkIntact() throws {
@@ -118,16 +119,14 @@ struct TaskMapUnlinkCommandTests {
             """)
       }
       let promoted = try run(args, scratch)
-      withKnownIssue("SI-86: task unlink has no guarded entry point") {
-        #expect(try TaskStateCommandTests.error(foreign)["code"] as? String == "claimed")
-        #expect(
-          try TaskStateCommandTests.error(promoted)["code"] as? String == "read_only_promoted")
-        let relation = try run(args + ["--rel", "blocked_by"], scratch)
-        #expect(try TaskStateCommandTests.error(relation)["code"] as? String == "invalid")
-        let notMap = try run(
-          ["task", "unlink", "AC-1", "url:https://example.invalid", "--json"], scratch)
-        #expect(try TaskStateCommandTests.error(notMap)["code"] as? String == "invalid")
-      }
+      #expect(try TaskStateCommandTests.error(foreign)["code"] as? String == "claimed")
+      #expect(
+        try TaskStateCommandTests.error(promoted)["code"] as? String == "read_only_promoted")
+      let relation = try run(args + ["--rel", "blocked_by"], scratch)
+      #expect(try TaskStateCommandTests.error(relation)["code"] as? String == "invalid")
+      let notMap = try run(
+        ["task", "unlink", "AC-1", "url:https://example.invalid", "--json"], scratch)
+      #expect(try TaskStateCommandTests.error(notMap)["code"] as? String == "invalid")
       #expect(try identities(store) == ["task|2|cites|app|1"])
     }
   }

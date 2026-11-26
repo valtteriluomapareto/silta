@@ -3,19 +3,24 @@ import GRDB
 /// Live references used by the map edit preview and the guarded save.
 enum WorkspaceMapReferences {
   static func blockers(_ removals: [WorkspaceMapRow], workspace: Int64, in db: Database) throws
-    -> [WorkspaceMapChanges.Blocker]
+    -> [WorkspaceMapBlocker]
   {
     let sources = Set(removals.filter { $0.table == "source" }.map(\.id))
     return try removals.compactMap { row in
       var refs: [String] = []
+      var taskRefs: [String] = []
       if ["app", "topic", "service", "edge"].contains(row.table) {
         refs = try documents(row, workspace: workspace, in: db).map {
           "doc:" + ($0["slug"] as String)
         }
-        refs += try links(row, workspace: workspace, in: db)
+        let linked = try links(row, workspace: workspace, in: db)
+        refs += linked.map { $0.ref }
+        taskRefs += linked.compactMap { $0.task }
       }
       if row.table == "app" {
-        refs += try appTasks(row.id, in: db)
+        let assigned = try appTasks(row.id, in: db)
+        refs += assigned
+        taskRefs += assigned
         let overrides = try count("worktree_override", by: "app_id", id: row.id, in: db)
         if overrides > 0 { refs.append("\(overrides) worktree override(s)") }
       }
@@ -31,7 +36,9 @@ enum WorkspaceMapReferences {
           "source:" + ($0["kind"] as String) + "/" + ($0["root"] as String)
         }
       }
-      return refs.isEmpty ? nil : .init(item: row.ref, references: Set(refs).sorted())
+      return refs.isEmpty
+        ? nil
+        : .init(item: row.ref, references: Set(refs).sorted(), taskRefs: Set(taskRefs).sorted())
     }.sorted { $0.item < $1.item }
   }
 
@@ -42,7 +49,7 @@ enum WorkspaceMapReferences {
     let id = match.old.id
     let row = WorkspaceMapRow(table: kind.rawValue, id: id, parts: [match.old.slug])
     let docs = try documents(row, workspace: workspace, in: db).count
-    let tagged = try links(row, workspace: workspace, in: db, tasksOnly: true)
+    let tagged = try links(row, workspace: workspace, in: db, tasksOnly: true).map { $0.ref }
     let tasks = try Set(tagged + (kind == .app ? appTasks(id, in: db) : [])).count
     let edges =
       try kind == .app
@@ -76,7 +83,7 @@ enum WorkspaceMapReferences {
 
   private static func links(
     _ row: WorkspaceMapRow, workspace: Int64, in db: Database, tasksOnly: Bool = false
-  ) throws -> [String] {
+  ) throws -> [(ref: String, task: String?)] {
     try Row.fetchAll(
       db,
       sql: """
@@ -87,11 +94,12 @@ enum WorkspaceMapReferences {
     ).map { link in
       let kind: String = link["to_kind"]
       let fallback = kind + " link #" + String(link["to_id"] as Int64)
-      guard kind == "task" || kind == "comment" else { return fallback }
+      guard kind == "task" || kind == "comment" else { return (fallback, nil) }
       do {
-        return String(try TaskLinkTarget.render(link, in: db).dropFirst(kind.count + 1))
+        let ref = String(try TaskLinkTarget.render(link, in: db).dropFirst(kind.count + 1))
+        return (ref, kind == "task" ? ref : nil)
       } catch StorageError.corrupt {
-        return fallback
+        return (fallback, nil)
       }
     }
   }
