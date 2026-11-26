@@ -55,12 +55,15 @@ extension TaskService {
     _ task: TaskDetails, workspace: String, steal: Bool, needsApproval: Bool
   ) -> CommandFailure {
     var message =
-      "\(task.ref) requires its registered repository. "
+      "\(TaskError.shown(task.ref)) requires its registered repository. "
       + "Run task start and subsequent task commands from that clone or a linked worktree."
+    if needsApproval { message += " Reuse the original approval when you retry." }
     guard RestoreService.canNameInRecovery(workspace) else {
       return CommandFailure(error: TaskError.foreignRepo, next: ["silta ws ls"], message: message)
     }
-    guard let path = task.repoPath, RestoreService.canNameInRecovery(path) else {
+    guard let path = task.repoPath, RestoreService.canNameInRecovery(path),
+      RestoreService.canNameInRecovery(task.ref)
+    else {
       return CommandFailure(
         error: TaskError.foreignRepo,
         next: [workspaceCommand("silta ws show", workspace: workspace)], message: message)

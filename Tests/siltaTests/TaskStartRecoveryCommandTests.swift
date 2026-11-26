@@ -63,6 +63,7 @@ struct TaskStartRecoveryCommandTests {
 
       let error = try TaskStateCommandTests.error(refusal)
       let next = try #require(error["next"] as? [String])
+      #expect((error["message"] as? String)?.contains("Reuse the original approval") == true)
       #expect(next.first == "silta --ws 'acme' task show 'AC-1'")
       let command = try #require(next.last)
       let placeholder = #""<the human's words>""#
@@ -72,8 +73,8 @@ struct TaskStartRecoveryCommandTests {
         at: scratch, scratch: scratch)
       try #require(retry.termination == .exit(0), "\(retry.stdout)\(retry.stderr)")
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
-      #expect(
-        try task(at: repo, scratch: scratch)["claimed_by"] as? String != "agent:codex:other")
+      let owner = try #require(task(at: repo, scratch: scratch)["claimed_by"] as? String)
+      #expect(owner != "agent:codex:other")
     }
   }
 
@@ -97,6 +98,13 @@ struct TaskStartRecoveryCommandTests {
       let args = ["task", "start", "AC-1", "--json"]
       let brokenCwd = try run(args, at: wrong, scratch: scratch)
       #expect(try TaskStateCommandTests.error(brokenCwd)["code"] as? String == "env")
+      let dangling = scratch.appending(path: "dangling-git")
+      try FileManager.default.createDirectory(at: dangling, withIntermediateDirectories: true)
+      try FileManager.default.createSymbolicLink(
+        at: dangling.appending(path: ".git"), withDestinationURL: scratch.appending(path: "missing")
+      )
+      let brokenMarker = try run(args, at: dangling, scratch: scratch)
+      #expect(try TaskStateCommandTests.error(brokenMarker)["code"] as? String == "env")
       try Data("broken\n".utf8).write(to: repo.appending(path: ".git/HEAD"))
       let brokenRegistered = try run(args, at: scratch, scratch: scratch)
       #expect(try TaskStateCommandTests.error(brokenRegistered)["code"] as? String == "env")
@@ -111,7 +119,12 @@ struct TaskStartRecoveryCommandTests {
       try fixture.git(["worktree", "add", "-qb", "linked-work", linked.path], repo, scratch)
       let start = try run(["task", "start", "AC-1"], at: linked, scratch: scratch)
       try #require(start.termination == .exit(0), "\(start.stdout)\(start.stderr)")
-      #expect(try task(at: linked, scratch: scratch)["branch"] as? String == "linked-work")
+      let recorded = try task(at: linked, scratch: scratch)
+      #expect(recorded["branch"] as? String == "linked-work")
+      let worktree = try #require(recorded["worktree"] as? String)
+      #expect(
+        URL(filePath: worktree).resolvingSymlinksInPath().path
+          == linked.resolvingSymlinksInPath().path)
     }
   }
 

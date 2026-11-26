@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct LocationGit {
@@ -79,7 +80,8 @@ struct LocationGit {
   private static func hasRepositoryMarker(at directory: URL) -> Bool {
     var ancestor = directory
     while ancestor.path != "/" {
-      if FileManager.default.fileExists(atPath: ancestor.appending(path: ".git").path) {
+      var marker = stat()
+      if lstat(ancestor.appending(path: ".git").path, &marker) == 0 {
         return true
       }
       ancestor.deleteLastPathComponent()
