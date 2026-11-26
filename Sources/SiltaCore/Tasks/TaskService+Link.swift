@@ -48,24 +48,70 @@ extension TaskService {
           relation, target.kind, target.id, target.external, target.anchor,
           environment.actor.description, Self.timestamp(at),
         ])
-      try tx.database.execute(
-        sql: """
-          UPDATE task
-          SET updated_at=?,claimed_at=CASE WHEN claimed_by=? THEN ? ELSE claimed_at END
-          WHERE id=?
-          """,
-        arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
+      try refreshLinkTask(task, at: at, in: tx)
       try changed(task.id, kind: "link", body: relation, redacted: content.1, at: at, in: tx)
       return result
     }
   }
 
-  private func validateLink(_ raw: String, relation: String) throws {
+  /// Removes one exact task-to-map relation without touching other references to the target.
+  package func unlink(_ ref: String, target raw: String, relation: String = "cites") throws
+    -> (receipt: TaskResult, removed: Bool)
+  {
+    try validateLinkRelation(relation)
+    let prefix = raw.prefix { $0 != ":" }
+    guard ["app", "topic", "edge", "service"].contains(String(prefix)),
+      raw.dropFirst(prefix.count).hasPrefix(":"), DocService.safeReference(raw)
+    else {
+      throw TaskError.invalid(
+        "Use a safe app:, topic:, edge: or service: reference from task show.")
+    }
+    let slug = try selected()
+    let at = environment.clock.now()
+    return try environment.db.write { tx in
+      let task = try Self.lookup(ref, workspace: slug, in: tx.database)
+      try validateClaim(task, workspace: slug, at: at)
+      let target = try TaskLinkTarget.resolve(raw, source: task, workspace: slug, in: tx.database)
+      let rendered = try target.rendered(in: tx.database)
+      guard DocService.safeReference(rendered) else {
+        throw TaskError.invalid("The resolved map reference cannot be shown safely.")
+      }
+      var result = receipt(task, warnings: target.warnings)
+      result.target = rendered
+      try tx.database.execute(
+        sql: """
+          DELETE FROM link WHERE workspace_id=? AND from_kind='task' AND from_id=? AND rel=?
+            AND to_kind=? AND to_id=? AND to_ext IS NULL AND anchor IS NULL
+          """, arguments: [task.workspaceID, task.id, relation, target.kind, target.id])
+      guard tx.database.changesCount != 0 else { return (result, false) }
+      try refreshLinkTask(task, at: at, in: tx)
+      try changed(
+        task.id, kind: "field", body: "unlinked " + relation + " " + rendered,
+        redacted: false, at: at, in: tx)
+      return (result, true)
+    }
+  }
+
+  private func refreshLinkTask(_ task: TaskDetails, at: Date, in tx: StorageTransaction) throws {
+    try tx.database.execute(
+      sql: """
+        UPDATE task
+        SET updated_at=?,claimed_at=CASE WHEN claimed_by=? THEN ? ELSE claimed_at END
+        WHERE id=?
+        """,
+      arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
+  }
+
+  private func validateLinkRelation(_ relation: String) throws {
     guard Self.relations.contains(relation) else {
       let values = Self.relations.dropLast().joined(separator: ", ")
       throw TaskError.invalid(
         "Use \(values) or \(Self.relations.last ?? ""); blocked_by is reserved.")
     }
+  }
+
+  private func validateLink(_ raw: String, relation: String) throws {
+    try validateLinkRelation(relation)
     if raw.hasPrefix("edge:") || raw.hasPrefix("service:") {
       throw CommandFailure(
         error: TaskError.invalid(

@@ -771,6 +771,14 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `task start` to address review findings (D41).
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
+- `task unlink AC-12 <map-ref> [--rel <relation>]` removes one exact, unanchored map
+  link shown by `task show`. It accepts app and topic targets and retained legacy
+  edge and service targets. The relations are `cites` (default), `about`, `source`
+  and `relates`. Claim and promoted-task rules apply even when the task is closed
+  or archived. A successful removal records a `field` event with body
+  `unlinked <relation> <target>`. JSON includes `ref`, `status` and `removed`.
+  An absent link to an existing target returns `removed: false` without changing
+  the task or its history.
 - **Receipts say what changed:** `AC-5 archived`, `AC-5 kept`, `AC-14 linked cites
   task:AC-2` (the target as `show` prints it), `AC-5 promoted to ado:4711; read-only
   here`, `AC-5 edited: title, plan` (or `AC-5 unchanged`). Their `--json` data stays
@@ -2277,6 +2285,7 @@ silta task triage
 silta task archive
 silta task keep
 silta task link
+silta task unlink
 silta task promote
 silta task diff [M2]
 silta task review [M2]
@@ -3146,8 +3155,12 @@ the selected snapshot. The metadata-only v9 migration raises the writer floor
 because earlier writers can reassign historical names (D32).
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
-item and its docs. Proposal-only or archived docs and `cites` links do not pin map
+item and its docs. Proposal-only or archived docs and document `cites` links do not pin map
 items; removing an item cleans its non-pinning doc links in the same transaction.
+Task map links and primary app assignments also pin items. A task conflict points
+to `task show` for inspecting the exact link or assignment. Use `task unlink` for
+the displayed relation. Independent app assignments and links on promoted tasks
+retain their protection.
 New app identities cannot use `doc`, `edge` or `service`; retained identities and
 faithful restore preserve those names. Their generic code refs require `code:`.
 New service slugs and edge kinds must be identifiers (letters/digits with internal

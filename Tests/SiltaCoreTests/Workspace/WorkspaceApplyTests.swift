@@ -138,4 +138,47 @@ struct WorkspaceApplyTests {
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
     }
   }
+
+  @Test func editorRetainsTaskInspectionAfterARejectedRemoval() throws {
+    try withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home)
+      try WorkspaceConfigTests.apply(
+        WorkspaceConfigTests.minimal + "topics: [{slug: messaging}]\n", to: store)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+            VALUES(1,'acme-task',1,1,'Acme issue','todo','human:acme','','');
+            INSERT INTO link(
+              uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+            VALUES('acme-link',1,'task',1,'cites','topic',1,'human:acme','');
+            """)
+      }
+      let human = try ActorID.detect(
+        environment: ["USER": "acme"],
+        terminal: .init(stdin: true, stdout: true), session: "acme")
+      let inspect = "silta --ws 'acme' task show 'AC-1'"
+      var calls = 0
+      do {
+        _ = try WorkspaceEditor.edit(
+          slug: "acme", store: store, actor: human,
+          identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant)
+        ) { file in
+          calls += 1
+          if calls == 1 {
+            try WorkspaceConfigTests.minimal.write(to: file, atomically: true, encoding: .utf8)
+          } else {
+            let draft = try String(contentsOf: file, encoding: .utf8)
+            #expect(draft.contains("# next: " + inspect))
+          }
+          return 0
+        }
+        Issue.record("Accepted a task's pinned topic removal")
+      } catch let error as WorkspaceError {
+        #expect(error.code == .conflict && error.next.contains(inspect) && error.nextBy == .agent)
+      }
+      #expect(calls == 2)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM topic") } == 1)
+    }
+  }
 }

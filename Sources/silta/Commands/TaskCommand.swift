@@ -8,7 +8,7 @@ struct TaskCommand: ParsableCommand {
       TaskStartCommand.self, TaskSubmitCommand.self, TaskDoneCommand.self, TaskDropCommand.self,
       TaskPlanCommand.self, TaskFromPlanCommand.self,
       TaskEditCommand.self, TaskTriageCommand.self, TaskArchiveCommand.self,
-      TaskKeepCommand.self, TaskLinkCommand.self, TaskPromoteCommand.self,
+      TaskKeepCommand.self, TaskLinkCommand.self, TaskUnlinkCommand.self, TaskPromoteCommand.self,
       TaskBlockCommand.self, TaskUnblockCommand.self,
     ])
 

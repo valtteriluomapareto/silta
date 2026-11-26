@@ -14,17 +14,21 @@ package struct WorkspaceMapChanges: Encodable, Sendable {
     package let environments: Int
   }
 
-  package struct Blocker: Encodable, Sendable {
-    package let item: String
-    package let references: [String]
-  }
-
   package let added: [String]
   package let removed: [String]
   package let renamed: [Rename]
-  package let blockers: [Blocker]
+  package let blockers: [WorkspaceMapBlocker]
 
   package var isEmpty: Bool { added.isEmpty && removed.isEmpty && renamed.isEmpty }
+}
+
+/// Map removal blockers and the task references that can be inspected.
+package struct WorkspaceMapBlocker: Encodable, Sendable {
+  package let item: String
+  package let references: [String]
+  let taskRefs: [String]
+
+  private enum CodingKeys: String, CodingKey { case item, references }
 }
 
 struct WorkspaceMapEdit {

@@ -389,7 +389,8 @@ extension WorkspaceRenameCommandTests {
       #expect(error["next_by"] as? String == "agent")
       #expect(
         error["next"] as? [String] == [
-          "silta --ws 'acme' doc ls", "silta --ws 'acme' ws show",
+          "silta --ws 'acme' task show 'AC-1'", "silta --ws 'acme' doc ls",
+          "silta --ws 'acme' ws show",
         ])
       let message = try #require(error["message"] as? String)
       #expect(message.contains("app:api (AC-1, doc:delivery-guide)"))
