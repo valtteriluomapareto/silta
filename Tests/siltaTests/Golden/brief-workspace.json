@@ -1,0 +1,1 @@
+{"data":{"location":{"app":null,"branch":null,"confidence":"low","reason":"workspace_only","repo":"","workspace":"acme"},"more":["silta --ws 'acme' task ls","silta --ws 'acme' ws show"],"sections":[],"settings":{},"truncated":false},"ok":true,"schema":1,"warnings":[]}

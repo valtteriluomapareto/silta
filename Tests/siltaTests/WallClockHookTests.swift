@@ -26,6 +26,30 @@ struct WallClockHookTests {
 
   func contextFixture(_ scratch: URL) throws -> URL { try brief.contextFixture(scratch) }
 
+  @Test func workspaceBriefHookNeedsAnExplicitScopeOutsideGit() throws {
+    try withScratchDirectory { scratch in
+      _ = try contextFixture(scratch)
+      let unscoped = try SiltaBinary.run(["brief", "--hook"], in: scratch, cwd: scratch)
+      #expect(unscoped == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
+      try #require(
+        AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
+          == .exit(0))
+      let command = try AgentsHookTests.command("SessionStart", in: scratch)
+      let installed = try AgentsHookTests.hook(
+        command, payload: #"{"session_id":"acme"}"#, in: scratch, cwd: scratch)
+      #expect(installed == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
+
+      let short = try run(["--short"], scratch, scratch)
+      let scoped = try run(["--hook"], scratch, scratch)
+      withKnownIssue("SI-264: even an explicitly scoped hook brief requires Git") {
+        #expect(scoped.stdout.hasPrefix("workspace: acme (outside Git)\n"))
+        #expect(scoped.stdout.count <= 3_200)
+        #expect(scoped == short)
+      }
+      #expect(try brief.hookTimeoutCount(scratch) == 0)
+    }
+  }
+
   /// The discussion tests' hook runs skip when the deadline trips; here a hook brief with
   /// a handoff, caller items and an inbox must finish and equal the short brief.
   @Test func hookDiscussionMatchesTheShortBriefWithinTheDeadline() throws {

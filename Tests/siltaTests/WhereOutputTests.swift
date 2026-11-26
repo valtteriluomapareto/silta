@@ -62,9 +62,11 @@ struct WhereOutputTests {
       _ = try fixture.setup(scratch)
       let result = try fixture.run(["--path", "/"], scratch, scratch)
       #expect(result.termination == .exit(2))
-      #expect(result.stdout.contains("Carry on without Silta"))
       #expect(!result.stdout.contains("init --scan"))
-      Golden.forTests().check(result.stdout, "where-outside-git.json")
+      withKnownIssue("SI-264: where outside Git hides the available workspace") {
+        let error = try TaskStateCommandTests.error(result)
+        #expect(error["next"] as? [String] == ["cd '/' && silta --ws 'acme' brief"])
+      }
     }
   }
 
