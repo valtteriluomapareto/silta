@@ -2,5 +2,6 @@ acme / platform / api [high: exact_ref]
 branch: api
 task: none
 app: api
+docs: none
 more: silta --ws 'acme' task ls
 more: silta --ws 'acme' ws show

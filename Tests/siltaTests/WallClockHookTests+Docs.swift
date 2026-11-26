@@ -39,8 +39,9 @@ extension WallClockHookTests {
         #expect(text.termination == .exit(0))
         let data = try fixture.data(run(flags + ["--json"], repo, scratch))
         let sections = try #require(data["sections"] as? [[String: String]])
-        let docs = sections.filter { $0["id"] == "docs" }.compactMap { $0["text"] }.joined()
-        #expect(!docs.isEmpty && text.stdout.contains(docs))
+        let parts = sections.filter { $0["id"] == "docs" }.compactMap { $0["text"] }
+        let docs = parts.joined()
+        #expect(!parts.isEmpty && parts.allSatisfy { text.stdout.contains($0) })
         #expect(!text.stdout.contains("legacy-title") && !text.stdout.contains("Another paragraph"))
         if !mode.isEmpty {
           #expect(!text.stdout.contains("Use the fallback."))

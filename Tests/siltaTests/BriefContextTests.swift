@@ -38,8 +38,9 @@ extension BriefCommandTests {
       let ids = sections.compactMap { $0["id"] }
       #expect(
         ids == [
-          "task", "plan", "description", "app", "app", "environments",
-          "neighbours", "neighbours", "neighbours", "open_tasks", "open_tasks", "glossary",
+          "task", "plan", "description", "app", "app", "environments", "docs",
+          "neighbours", "docs", "neighbours", "docs", "neighbours", "docs",
+          "open_tasks", "open_tasks", "glossary",
         ])
       Golden.forTests().check(normalizeBrief(result.stdout, repo), "brief-context.txt")
       Golden.forTests().check(

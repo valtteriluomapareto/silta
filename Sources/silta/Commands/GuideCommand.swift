@@ -41,6 +41,7 @@ extension GuideCommand {
   private static let docsOverview = """
     # Workspace docs
     Read the docs beside your work; follow printed refs with doc show.
+    docs: none and doc_gap mark items no doc covers; a gap alone is no reason to propose.
     Check doc ls --about <ref> before proposing lasting missing knowledge.
     Proposals stay pending; read their pinned diff and ask for a human decision.
     Editing, triage and archive need the human's exact approval.
@@ -143,6 +144,9 @@ extension GuideCommand {
       text: #"""
         # Workspace docs
         Read the docs beside your work in the brief. Follow printed doc ls and doc show refs.
+        docs: none and a doc_gap warning mean no doc or pending proposal covers the item.
+        A gap alone is no reason to propose. Before your handoff, reread the brief's docs: none
+        lines; after submit or handoff released your claim, propose with doc propose --task <ref>.
         Before proposing, run doc ls --about <ref> and revise an existing doc when it fits.
         Use doc ls --doc <slug> to list one document’s current and pending revisions.
         Check whether another app would rediscover the knowledge from its about items.

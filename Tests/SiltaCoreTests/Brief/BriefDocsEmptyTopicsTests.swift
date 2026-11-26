@@ -24,7 +24,7 @@ struct BriefDocsEmptyTopicsTests {
     _ store: DatabaseStore, location: LocationResult, compact: Bool
   ) throws {
     let groups = try BriefDocsTests.context(store, location: location, compact: compact)
-      .flatMap(\.documents)
+      .flatMap(\.documents).filter { !$0.isGap }
     let group = try #require(groups.first)
     #expect(groups.count == 1 && group.total == 3)
     if compact {

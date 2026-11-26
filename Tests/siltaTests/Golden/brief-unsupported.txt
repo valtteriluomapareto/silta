@@ -4,5 +4,6 @@ settings: proposals: ask (ask in chat before adding a task)
 settings unsupported: review_gate, archive_after_days (ask the human)
 task: none
 app: api
+docs: none
 more: silta --ws 'acme' task ls
 more: silta --ws 'acme' ws show
