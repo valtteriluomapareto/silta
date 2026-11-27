@@ -13,7 +13,7 @@ package struct BriefReport: Encodable, Sendable {
   /// Whether any optional content was shortened or omitted.
   package var truncated = false
   /// Location diagnostics rendered by the command envelope and recorded in the log.
-  package let warnings: [OutputWarning]
+  package var warnings: [OutputWarning]
 
   var pendingWorkEvidence: TaskEvidenceInput?
 

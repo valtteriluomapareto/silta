@@ -57,6 +57,12 @@ struct TaskEvidenceGit {
     return .unknown
   }
 
+  mutating func configuredTip(_ repo: TaskEvidenceRepo?) async -> Tip {
+    guard let repo, Self.isLiteralBranch(repo.appRef) else { return .unknown }
+    if repo.appRef.hasPrefix("refs/") { return await exactTip(repo.appRef, repo: repo) }
+    return await tip(repo.appRef, repo: repo)
+  }
+
   mutating func reachability(_ sha: String, at tip: Tip, repo: TaskEvidenceRepo?)
     async -> TaskWorkEvidence.Reachability
   {
@@ -79,18 +85,39 @@ struct TaskEvidenceGit {
   private mutating func exactTip(_ ref: String, repo: TaskEvidenceRepo) async -> Tip {
     let key = Key(repo: repo.id, value: ref)
     if let cached = tips[key] { return cached }
-    let result = await run(["show-ref", "--exists", ref], repo: repo)
+    let observed = await capturedTip(ref, repo: repo)
     let tip: Tip
-    if result?.termination == .exit(2) {
-      tip = .missing
-    } else if result?.termination == .exit(0), let sha = await commitID(ref, repo: repo) {
-      tip = .found(ref: ref, sha: sha)
-      commits[Key(repo: repo.id, value: sha)] = true
-    } else {
-      tip = .unknown
+    switch observed {
+    case .found(_, let object):
+      if let sha = await commitID(object, repo: repo) {
+        tip = .found(ref: ref, sha: sha)
+        commits[Key(repo: repo.id, value: sha)] = true
+      } else {
+        tip = .unknown
+      }
+    case .missing, .unknown:
+      tip = observed
     }
     tips[key] = tip
     return tip
+  }
+
+  private mutating func capturedTip(_ ref: String, repo: TaskEvidenceRepo) async -> Tip {
+    let result = await run(
+      ["for-each-ref", "--count=2", "--format=%(refname) %(objectname)", "--", ref], repo: repo)
+    guard let result, result.termination == .exit(0), result.stderr.isEmpty,
+      !result.stdoutTruncated, let text = String(bytes: result.stdout, encoding: .utf8)
+    else { return .unknown }
+    for line in text.split(separator: "\n") {
+      let fields = line.split(separator: " ", omittingEmptySubsequences: false)
+      guard fields.count == 2, TaskCommitReference.isFullSHA(fields[1]) else { return .unknown }
+      if fields[0] == ref { return .found(ref: ref, sha: fields[1].lowercased()) }
+      guard fields[0].hasPrefix(ref + "/") else { return .unknown }
+    }
+    // A dangling symbolic ref may be omitted by the enumeration.
+    let symbolic = await run(["symbolic-ref", "--quiet", "--no-recurse", ref], repo: repo)
+    return symbolic?.termination == .exit(1) && symbolic?.stderr.isEmpty == true
+      ? .missing : .unknown
   }
 
   private mutating func hasCommit(_ sha: String, repo: TaskEvidenceRepo) async -> Bool {

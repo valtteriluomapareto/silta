@@ -16,9 +16,10 @@ struct TaskEvidenceGitTests {
       let repo = try self.repo(scratch)
       let runner = scripted(
         [
-          (["show-ref", "--exists", "refs/heads/origin/main"], result(2)),
-          (["show-ref", "--exists", ref], result(0)),
-          (resolve(ref), result(0, tip + "\n")),
+          (query("refs/heads/origin/main"), result(0)),
+          (symbolic("refs/heads/origin/main"), result(1)),
+          (query(ref), result(0, "\(ref) \(tip)\n")),
+          (resolve(tip), result(0, tip + "\n")),
           (resolve(sha), result(0, sha + "\n")),
           (["merge-base", "--is-ancestor", sha, tip], result(1)),
           (["rev-parse", "--is-shallow-repository"], result(0, shallow ? "true\n" : "false\n")),
@@ -32,7 +33,7 @@ struct TaskEvidenceGitTests {
       #expect(exact == .found(ref: ref, sha: tip))
       #expect(state == (shallow ? .unknown : .unreachable) && same == state)
       #expect(runner.isExhausted)
-      #expect(runner.requests.count == 6)
+      #expect(runner.requests.count == 7)
       #expect(
         runner.requests.allSatisfy { !$0.lazyFetch && $0.timeout <= 0.5 && $0.capture != nil })
     }
@@ -44,11 +45,11 @@ struct TaskEvidenceGitTests {
       let local = "refs/heads/origin/main"
       let runner = scripted(
         [
-          (["show-ref", "--exists", local], result(0)),
-          (resolve(local), result(0, sha + "\n")),
-          (["show-ref", "--exists", ref], result(0)),
-          (resolve(ref), result(0, tip + "\n")),
-          (["show-ref", "--exists", "refs/heads/slow"], GitResult(termination: .timedOut)),
+          (query(local), result(0, "\(local) \(sha)\n")),
+          (resolve(sha), result(0, sha + "\n")),
+          (query(ref), result(0, "\(ref) \(tip)\n")),
+          (resolve(tip), result(0, tip + "\n")),
+          (query("refs/heads/slow"), GitResult(termination: .timedOut)),
         ], at: scratch)
       var evidence = TaskEvidenceGit(runner: runner)
       #expect(await evidence.tip("origin/main", repo: repo) == .unknown)
@@ -63,29 +64,56 @@ struct TaskEvidenceGitTests {
       let repo = try self.repo(scratch)
       let absent = "refs/heads/absent"
       let broken = "refs/heads/broken"
+      let dangling = "refs/heads/dangling"
+      let tip64 = tip + String(repeating: "c", count: 24)
       let runner = scripted(
         [
-          (["show-ref", "--exists", ref], result(0)),
-          (resolve(ref), result(0, tip + String(repeating: "c", count: 24) + "\n")),
+          (query(ref), result(0, "\(ref) \(tip64)\n")),
+          (resolve(tip64), result(0, tip64 + "\n")),
           (resolve(sha), result(0, sha + String(repeating: "f", count: 24) + "\n")),
-          (["show-ref", "--exists", absent], result(2)),
-          (["show-ref", "--exists", broken], result(0)),
-          (resolve(broken), result(1)),
+          (query(absent), result(0, "\(absent)/nested \(tip64)\n")),
+          (symbolic(absent), result(1)),
+          (query(broken), result(0, "\(broken) \(tip64)\n")),
+          (resolve(tip64), result(1)),
+          (query(dangling), result(0)),
+          (symbolic(dangling), result(0, "refs/heads/gone\n")),
         ], at: scratch)
       var evidence = TaskEvidenceGit(runner: runner)
       let tip = await evidence.tip(ref, repo: repo)
       #expect(await evidence.reachability(sha, at: tip, repo: repo) == .unknown)
       #expect(await evidence.tip("absent", repo: repo, localOnly: true) == .missing)
       #expect(await evidence.tip("broken", repo: repo, localOnly: true) == .unknown)
-      #expect(runner.isExhausted && runner.requests.count == 6)
+      #expect(await evidence.tip("dangling", repo: repo, localOnly: true) == .unknown)
+      #expect(runner.isExhausted && runner.requests.count == 9)
     }
   }
 
-  private func repo(_ scratch: URL) throws -> TaskEvidenceRepo {
+  @Test func configuredAnnotatedTagUsesItsCapturedCommit() async throws {
+    try await withScratchDirectory { scratch in
+      let tag = "refs/tags/v1"
+      let repo = try self.repo(scratch, appRef: tag)
+      let runner = scripted(
+        [(query(tag), result(0, "\(tag) \(sha)\n")), (resolve(sha), result(0, tip + "\n"))],
+        at: scratch)
+      var evidence = TaskEvidenceGit(runner: runner)
+      #expect(await evidence.configuredTip(repo) == .found(ref: tag, sha: tip))
+      #expect(runner.isExhausted)
+    }
+  }
+
+  private func repo(_ scratch: URL, appRef: String? = nil) throws -> TaskEvidenceRepo {
     try FileManager.default.createDirectory(
       at: scratch.appending(path: ".git"), withIntermediateDirectories: false)
     return TaskEvidenceRepo(
-      id: 1, name: "platform", path: scratch.path, appRef: ref, fetchedAt: nil)
+      id: 1, name: "platform", path: scratch.path, appRef: appRef ?? ref, fetchedAt: nil)
+  }
+
+  private func query(_ ref: String) -> [String] {
+    ["for-each-ref", "--count=2", "--format=%(refname) %(objectname)", "--", ref]
+  }
+
+  private func symbolic(_ ref: String) -> [String] {
+    ["symbolic-ref", "--quiet", "--no-recurse", ref]
   }
 
   private func resolve(_ object: String) -> [String] {

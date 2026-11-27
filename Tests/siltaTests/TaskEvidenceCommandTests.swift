@@ -60,8 +60,12 @@ struct TaskEvidenceCommandTests {
       #expect((observed["branch"] as? [String: String])?["source"] == "claim")
       let brief = try ok(["brief", "--task", "AC-1"], scratch)
       #expect(brief.stdout.contains("refs/remotes/origin/api") && brief.stdout.contains("cached"))
+      #expect(try TaskStateCommandTests.warnings(brief).contains("ref_stale"))
       let short = try ok(["brief", "--task", "AC-1", "--short"], scratch)
       #expect(!short.stdout.contains("refs/remotes/origin/api"))
+      #expect(try !TaskStateCommandTests.warnings(short).contains("ref_stale"))
+      let tiny = try ok(["brief", "--task", "AC-1", "--budget", "1"], scratch)
+      #expect(try !TaskStateCommandTests.warnings(tiny).contains("ref_stale"))
       try git.git(["switch", "--detach", other], repo, scratch)
       try git.git(["update-ref", "refs/heads/acme-work", other], repo, scratch)
       let moved = try ok(["task", "show", "AC-1"], scratch)
@@ -69,6 +73,8 @@ struct TaskEvidenceCommandTests {
       try git.git(["branch", "-D", "acme-work"], repo, scratch)
       let lost = try ok(["task", "show", "AC-1"], scratch)
       #expect(try TaskStateCommandTests.warnings(lost).contains("task_branch_missing"))
+      let lostBrief = try ok(["brief", "--task", "AC-1"], scratch)
+      #expect(try TaskStateCommandTests.warnings(lostBrief).contains("task_branch_missing"))
     }
   }
 
@@ -101,6 +107,38 @@ struct TaskEvidenceCommandTests {
       _ = try ok(["comment", "AC-1", "--kind", "handoff", "-m", "> Branch: old-quote"], scratch)
       let quoted = try TaskStateCommandTests.data(ok(["task", "show", "AC-1"], scratch))
       #expect(quoted["work_evidence"] == nil)
+      _ = try ok(
+        [
+          "comment", "AC-1", "--kind", "handoff", "--allow-secret", "--approved",
+          "Keep the Acme fixture.", "-m",
+          "State: Acme fixture.\n"
+            + "-----BEGIN PRIVATE KEY-----\nBranch: feature/private\n-----END PRIVATE KEY-----",
+        ], scratch)
+      let retained = try TaskStateCommandTests.data(ok(["task", "show", "AC-1"], scratch))
+      #expect(retained["work_evidence"] == nil)
+    }
+  }
+
+  @Test func missingObjectsAndTrackingRefsKeepCoverageUnknown() throws {
+    try withScratchDirectory { scratch in
+      let repo = try AcmeWorkspaces.setup(scratch)
+      let tip = try oid("refs/remotes/origin/api", repo: repo, scratch: scratch)
+      try git.git(["switch", "-c", "acme-work", tip], repo, scratch)
+      _ = try ok(["task", "add", "--start", "--app", "api", "Acme evidence"], scratch, cwd: repo)
+      let missing = String(repeating: "a", count: 40)
+      _ = try ok(["task", "link", "AC-1", "code:api@\(missing)"], scratch)
+      let tracking = "refs/remotes/origin/acme-missing"
+      try database(scratch).write {
+        try $0.database.execute(
+          sql: "UPDATE app SET ref=? WHERE slug='api'", arguments: [tracking])
+      }
+      let show = try ok(["task", "show", "AC-1"], scratch)
+      let observed = try evidence(show)
+      let branch = try #require(observed["branch"] as? [String: String])
+      #expect(branch["state"] == "unknown" && branch["tip_sha"] == tip)
+      let commits = try #require(observed["commits"] as? [[String: String]])
+      #expect(commits.first?["state"] == "unknown" && commits.first?["ref"] == tracking)
+      #expect(try TaskStateCommandTests.warnings(show) == ["ref_stale"])
     }
   }
 

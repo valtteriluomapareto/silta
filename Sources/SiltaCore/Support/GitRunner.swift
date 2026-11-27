@@ -8,7 +8,7 @@ package struct GitRequest: Equatable, Sendable {
   package let directory: URL
   /// Seconds before termination is requested; must be finite and positive.
   package let timeout: TimeInterval
-  /// Whether git may fetch missing promised objects. Suppression is best effort.
+  /// Whether git may fetch missing promised objects. Local-only reads also deny transport.
   package let lazyFetch: Bool
 
   /// Optional bound for each captured stream. Other callers retain lossless capture.

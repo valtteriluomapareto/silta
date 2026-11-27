@@ -781,9 +781,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   and separately the last recorded fetch time for tracking refs. Evidence is
   local. Shallow negatives, ambiguous refs and failed or incomplete reads stay
   unknown. These reads use bounded Git probes and never fetch. Compact briefs
-  keep the existing task detail pointer.
+  keep the existing task detail pointer. An ordinary brief includes warnings
+  when its evidence section fits.
 - Check the exact local branch of a fresh doing claim, or a safe branch named by
-  the latest live handoff (`Branch:` or `Branch and sha: … at …`). A detached
+  the latest live handoff (`Branch:` or `Branch and sha: … at …`).
+  Handoffs with detected secrets give no branch evidence. A detached
   HEAD gives no branch evidence. A proven missing ref warns
   `task_branch_missing` even without commit links. A complete-history negative
   for a linked commit in the same repository warns `task_branch_lacks_commit`.

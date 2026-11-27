@@ -141,11 +141,17 @@ struct TaskEvidenceInput: Sendable {
   }
 
   private static func handoffBranch(_ body: String) -> String? {
-    let lines = String(body.prefix(16_384)).components(separatedBy: "\n")
+    guard body.prefix(16_384).endIndex == body.endIndex,
+      SecretGuard.matches(in: body).isEmpty
+    else { return nil }
+    let lines = body.components(separatedBy: "\n")
     let names = MarkdownPlan.visibleLines(lines).compactMap { index -> String? in
       let raw = lines[index]
-      let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !raw.hasPrefix("    "), !raw.hasPrefix("\t"), !line.hasPrefix(">") else { return nil }
+      let content = raw.drop(while: { $0 == " " })
+      let line = content.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !raw.hasPrefix("    "), !content.hasPrefix("\t"), !line.hasPrefix(">") else {
+        return nil
+      }
       let name: Substring
       if let found = line.wholeMatch(of: /Branch:[ \t]+(\S+)/) {
         name = found.1
@@ -193,23 +199,25 @@ struct TaskEvidenceInput: Sendable {
     var evidence: [TaskWorkCommit] = []
     var warnedRepos = Set<Int64>()
     for commit in commits.prefix(3) {
-      let tip = await git.tip(commit.repo?.appRef ?? "", repo: commit.repo)
+      let tip = await git.configuredTip(commit.repo)
       let state = await git.reachability(commit.identity.sha, at: tip, repo: commit.repo)
       evidence.append(Self.commitResult(commit, at: tip, state: state))
-      if case .found(let ref, _) = tip, ref.hasPrefix("refs/remotes/"), let repo = commit.repo,
-        warnedRepos.insert(repo.id).inserted, let warning = fetchWarning(repo)
+      if let repo = commit.repo, Self.observedTrackingRef(tip, repo: repo) != nil,
+        warnedRepos.insert(repo.id).inserted,
+        let warning = fetchWarning(repo, missing: tip == .missing)
       {
         warnings.append(warning)
       }
       if let branch, let repo = branch.repo, commit.repo?.id == repo.id,
-        await git.reachability(commit.identity.sha, at: branchTip, repo: repo) == .unreachable
+        case .found = branchTip
       {
-        branchState?.state = "missing_commit"
-        warnings.append(
-          OutputWarning(
-            code: "task_branch_lacks_commit",
-            message: "Branch \(branch.name) from \(HumanText.line(branch.source)) lacks linked "
-              + "commit \(commit.identity.sha) in the cached clone."))
+        let state = await git.reachability(commit.identity.sha, at: branchTip, repo: repo)
+        if state == .unreachable {
+          branchState?.state = "missing_commit"
+          warnings.append(Self.missingCommitWarning(branch, commit: commit.identity.sha))
+        } else if state == .unknown, branchState?.state != "missing_commit" {
+          branchState?.state = "unknown"
+        }
       }
     }
     return TaskWorkEvidence(
@@ -223,12 +231,28 @@ struct TaskEvidenceInput: Sendable {
   ) -> TaskWorkCommit {
     let target = "code:" + commit.identity.stored
     guard case .found(let ref, let sha) = tip else {
-      return .init(target: target, ref: nil, tipSHA: nil, fetchedAt: nil, state: state)
+      let tracking = commit.repo.flatMap { observedTrackingRef(tip, repo: $0) }
+      return .init(target: target, ref: tracking, tipSHA: nil, fetchedAt: nil, state: state)
     }
     return .init(
       target: target, ref: ref, tipSHA: sha,
       fetchedAt: ref.hasPrefix("refs/remotes/") ? commit.repo?.fetchedAt.map(HumanText.line) : nil,
       state: state)
+  }
+
+  private static func observedTrackingRef(_ tip: TaskEvidenceGit.Tip, repo: TaskEvidenceRepo)
+    -> String?
+  {
+    if case .found(let ref, _) = tip, ref.hasPrefix("refs/remotes/") { return ref }
+    if tip == .missing, repo.appRef.hasPrefix("refs/remotes/") { return repo.appRef }
+    return nil
+  }
+
+  private static func missingCommitWarning(_ branch: Branch, commit: String) -> OutputWarning {
+    .init(
+      code: "task_branch_lacks_commit",
+      message: "Branch \(branch.name) from \(HumanText.line(branch.source)) lacks linked "
+        + "commit \(commit) in the cached clone.")
   }
 
   private func branchResult(at tip: TaskEvidenceGit.Tip) -> TaskWorkBranch? {
@@ -252,8 +276,8 @@ struct TaskEvidenceInput: Sendable {
     ]
   }
 
-  private func fetchWarning(_ repo: TaskEvidenceRepo) -> OutputWarning? {
-    if let raw = repo.fetchedAt,
+  private func fetchWarning(_ repo: TaskEvidenceRepo, missing: Bool) -> OutputWarning? {
+    if !missing, let raw = repo.fetchedAt,
       let date = try? Date(raw, strategy: .iso8601),  // An unreadable fetch time is unknown.
       now.timeIntervalSince(date) < 86_400
     {

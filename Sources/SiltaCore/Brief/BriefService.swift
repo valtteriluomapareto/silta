@@ -31,14 +31,17 @@ package struct BriefService {
         location, app: app, topics: topics, budget: budget, compact: short || hook, at: now, in: $0)
     }
     await addEdgeCommands(to: &report, workspace: location.workspace)
-    if let pending = report.pendingWorkEvidence {
-      let evidence = await pending.inspect(using: environment.git)
+    let evidence = await report.pendingWorkEvidence?.inspect(using: environment.git)
+    if let evidence {
       report.sections.append(
         BriefSection(id: "work_evidence", text: evidence.lines.joined(separator: "\n") + "\n"))
       report.pendingWorkEvidence = nil
     }
     report.trim(tokens: budget)
     report.insertDocuments(tokens: budget)
+    if let evidence, report.sections.contains(where: { $0.id == "work_evidence" }) {
+      report.warnings += evidence.warnings
+    }
     return report
   }
 
