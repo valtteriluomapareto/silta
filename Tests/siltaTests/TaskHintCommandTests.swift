@@ -129,6 +129,49 @@ struct TaskHintCommandTests {
 }
 
 extension TaskHintCommandTests {
+  @Test(arguments: [false, true])
+  func scanBoundaryNeitherInventsARefNorExposesARetainedSecret(secret: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      try add(2, in: scratch)
+      let plan =
+        secret
+        ? String(repeating: "x", count: 16_350) + " Pwd='token AC-2 "
+          + String(repeating: " long continuation", count: 4) + "'\n- [ ] Check"
+        : String(repeating: "x", count: 16_379) + " AC-20.\n- [ ] Check"
+      let approval = secret ? ["--allow-secret", "--approved", "Keep the Acme fixture."] : []
+      let result = try ok(["task", "plan", "AC-1", "-m", plan] + approval, in: scratch)
+      #expect(try hints(result).isEmpty)
+      let actual = try ok(["comment", "AC-1", "-m", "Coordinate with `task:AC-2`."], in: scratch)
+      #expect(try hints(actual).count == 1)
+    }
+  }
+
+  @Test func otherTypedRefsDoNotConsumeTheHintAndTheMarkerIsOpaque() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try add(2, in: scratch)
+      let uid = "Pwd=acme-imported-uid"
+      try store.write {
+        try $0.database.execute(sql: "UPDATE task SET uid=? WHERE seq=2", arguments: [uid])
+      }
+      let refs =
+        "See app:AC-2, topic:AC-2, note:AC-2, <mailto:AC-2@example.invalid> "
+        + "and [URI](urn:example:AC-2)."
+      let typed = try ok(["comment", "AC-1", "-m", refs], in: scratch)
+      #expect(try hints(typed).isEmpty)
+      let actual = try ok(
+        ["comment", "AC-1", "-m", "Coordinate with [AC-2](https://example.invalid)."], in: scratch)
+      #expect(try hints(actual).count == 1)
+      let events = try store.read {
+        try String.fetchAll($0, sql: "SELECT body FROM task_event WHERE kind='field'")
+      }
+      let marker = try #require(events.first)
+      #expect(marker.hasPrefix("hinted task ") && marker.count == 76)
+      #expect(!marker.contains(uid))
+    }
+  }
+
   @Test func retainedSecretContentsAreNotTreatedAsTaskReferences() throws {
     try withScratchDirectory { scratch in
       _ = try TaskCommandTests.setup(scratch)
@@ -179,8 +222,9 @@ extension TaskHintCommandTests {
         try $0.database.execute(
           sql: """
             CREATE TRIGGER refuse_advisory BEFORE INSERT ON task_event
-            WHEN new.kind='field'
-              AND new.body='hinted task ' || (SELECT uid FROM task WHERE seq=3)
+            WHEN new.kind='field' AND new.body LIKE 'hinted task %'
+              AND EXISTS(SELECT 1 FROM task_event WHERE task_id=new.task_id
+                AND kind='field' AND body LIKE 'hinted task %')
             BEGIN SELECT RAISE(ABORT,'Acme injected advisory failure'); END;
             """)
       }

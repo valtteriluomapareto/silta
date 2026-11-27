@@ -13,6 +13,7 @@ extension TaskService {
     let consent = try approval(
       required: input.allowSecret, command: command + " --allow-secret -F <file>")
     let (draft, redacted) = try checkedComment(input, command: command)
+    let hintText = referenceHintText([draft.body], allowSecret: draft.allowSecret)
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
@@ -46,7 +47,7 @@ extension TaskService {
         let gap = try? docGapWarning(task, workspace: slug, in: tx.database)  // advisory only
         warnings += [gap ?? nil].compactMap { $0 }
       }
-      warnings += taskReferenceWarnings([draft.body], task: task, workspace: slug, at: at, in: tx)
+      warnings += taskReferenceWarnings(hintText, task: task, workspace: slug, at: at, in: tx)
       return CommentResult(
         comment: CommentDetails(row: row, task: task.ref), warnings: warnings,
         approvalUsed: consent != nil, released: released)

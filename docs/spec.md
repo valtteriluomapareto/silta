@@ -777,7 +777,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   code blocks and URLs are skipped. Up to three first-appearance warnings per
   receipt show scoped commands to relate the two tasks or, when both statuses and
   the claim permit it, record a blocker with a reason. Each emitted pair is
-  recorded once in a portable field event and omitted from the normal timeline.
+  recorded once using an opaque task identity digest in a portable field event,
+  and omitted from the normal timeline.
   Advisory errors leave the main write intact. Callers that discard warning
   receipts leave hints available for a later CLI write.
 - Ticking the last unchecked top-level step of a `doing` task warns

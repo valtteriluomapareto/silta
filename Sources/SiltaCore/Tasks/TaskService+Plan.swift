@@ -15,6 +15,7 @@ extension TaskService {
     let content = try checked(
       text, allow: allowSecret,
       command: Self.planCommand(ref, ifRevision: ifRevision) + " -F <file>")
+    let hintText = referenceHintText([content.0], allowSecret: allowSecret)
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -28,7 +29,7 @@ extension TaskService {
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev + 1, plan: content.0,
         warnings: (content.1 ? [SecretGuard.warning] : [])
-          + taskReferenceWarnings([content.0], task: task, workspace: slug, at: at, in: tx))
+          + taskReferenceWarnings(hintText, task: task, workspace: slug, at: at, in: tx))
     }
   }
 

@@ -1,15 +1,31 @@
+import CryptoKit
 import Foundation
 import GRDB
 
 extension TaskService {
   static let referenceHintMarker = "hinted task "
 
+  /// Mask retained secrets before limiting text, without holding the writer lock.
+  func referenceHintText(_ texts: [String], allowSecret: Bool) -> [String] {
+    guard referenceHints else { return [] }
+    return texts.map { raw in
+      let text = allowSecret ? SecretGuard.redacted(raw) : raw
+      let head = text.prefix(16_384)
+      if head.endIndex == text.endIndex || text[head.endIndex].isWhitespace {
+        return String(head)
+      }
+      return head.lastIndex(where: \.isWhitespace).map { String(head[..<$0]) } ?? ""
+    }
+  }
+
   /// Advisory receipts opt in so callers that discard warnings leave the hint available.
   func taskReferenceWarnings(
     _ texts: [String], task: @autoclosure () throws -> TaskDetails, workspace: String,
     at: Date, in tx: StorageTransaction
   ) -> [OutputWarning] {
-    guard referenceHints, RestoreService.canNameInRecovery(workspace) else { return [] }
+    guard !texts.allSatisfy(\.isEmpty), RestoreService.canNameInRecovery(workspace) else {
+      return []
+    }
     var warnings: [OutputWarning] = []
     do {
       try tx.database.inSavepoint {
@@ -24,9 +40,9 @@ extension TaskService {
             let target = try unrelatedTarget(
               ref, from: source, workspace: workspace, in: tx.database)
           else { continue }
-          try event(
-            "field", task: source.id, body: Self.referenceHintMarker + target.uid, at: at, in: tx)
-          warnings.append(Self.referenceWarning(from: source, to: target, workspace: workspace))
+          try event("field", task: source.id, body: target.marker, at: at, in: tx)
+          warnings.append(
+            Self.referenceWarning(from: source, to: target.task, workspace: workspace))
           if warnings.count == 3 { break }
         }
         return .commit
@@ -41,20 +57,22 @@ extension TaskService {
     var seen = Set<String>()
     var refs: [String] = []
     for text in texts {
-      let visible = SecretGuard.redacted(String(text.prefix(16_384)))
-      let lines = visible.components(separatedBy: "\n")
+      let lines = text.components(separatedBy: "\n")
       for index in MarkdownPlan.visibleLines(lines) {
         let line = lines[index]
         let content = line.drop(while: { $0 == " " })
         if line.hasPrefix("    ") || content.hasPrefix("\t") || content.hasPrefix(">") { continue }
-        for word in line.split(whereSeparator: \.isWhitespace) where !word.contains("://") {
-          for token in word.split(whereSeparator: { !taskTokenCharacter($0) }) {
-            guard token.hasPrefix(prefix),
-              let seq = Int64(token.dropFirst(prefix.count)), seq > 0,
-              token == prefix + String(seq)
+        for word in line.split(whereSeparator: \.isWhitespace) {
+          guard let prose = proseToken(word) else { continue }
+          for token in prose.split(whereSeparator: { !taskTokenCharacter($0) }) {
+            let typed = token.hasPrefix("task:") ? token.dropFirst(5) : token
+            let ref = typed.last == ":" ? typed.dropLast() : typed
+            guard ref.hasPrefix(prefix),
+              let seq = Int64(ref.dropFirst(prefix.count)), seq > 0,
+              ref == prefix + String(seq)
             else { continue }
-            let ref = String(token)
-            if seen.insert(ref).inserted { refs.append(ref) }
+            let canonical = String(ref)
+            if seen.insert(canonical).inserted { refs.append(canonical) }
             if refs.count == 32 { return refs }
           }
         }
@@ -63,14 +81,24 @@ extension TaskService {
     return refs
   }
 
+  private static func proseToken(_ word: Substring) -> Substring? {
+    if word.hasPrefix("["), let destination = word.range(of: "](") {
+      return word[..<destination.lowerBound]
+    }
+    let candidate = word.drop(while: { !$0.isLetter }).lowercased()
+    guard !word.contains("://"), !candidate.hasPrefix("mailto:"), !candidate.hasPrefix("urn:")
+    else { return nil }
+    return word
+  }
+
   private static func taskTokenCharacter(_ character: Character) -> Bool {
     character.isLetter || character.isNumber || character == "-" || character == "_"
-      || character == "/"
+      || character == "/" || character == ":"
   }
 
   private func unrelatedTarget(
     _ ref: String, from source: TaskDetails, workspace: String, in db: Database
-  ) throws -> TaskDetails? {
+  ) throws -> (task: TaskDetails, marker: String)? {
     guard RestoreService.canNameInRecovery(ref) else { return nil }
     let target: TaskDetails
     do { target = try Self.lookup(ref, workspace: workspace, in: db) } catch TaskError.notFound {
@@ -80,6 +108,9 @@ extension TaskService {
       target.status != "proposed" || target.createdBy == environment.actor.description
         || environment.actor.isHuman
     else { return nil }
+    let marker =
+      Self.referenceHintMarker
+      + SHA256.hash(data: Data(target.uid.utf8)).map { String(format: "%02x", $0) }.joined()
     let linkedOrHinted = try Bool.fetchOne(
       db,
       sql: """
@@ -94,9 +125,9 @@ extension TaskService {
         """,
       arguments: [
         "workspace": source.workspaceID, "source": source.id, "target": target.id,
-        "marker": Self.referenceHintMarker + target.uid,
+        "marker": marker,
       ])
-    return linkedOrHinted == true ? nil : target
+    return linkedOrHinted == true ? nil : (target, marker)
   }
 
   private static func referenceWarning(
