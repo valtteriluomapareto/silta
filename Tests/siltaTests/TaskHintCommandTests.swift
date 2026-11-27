@@ -167,7 +167,7 @@ extension TaskHintCommandTests {
   @Test func undeliveredAndFailedAdvisoriesDoNotConsumeTheMarker() async throws {
     try await withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
-      try add(2, in: scratch)
+      try add(3, in: scratch)
       let environment = try await SiltaEnvironment.system(
         environment: TaskCommandTests.fixed.merging([
           "SILTA_HOME": scratch.appending(path: "silta-home").path
@@ -179,18 +179,19 @@ extension TaskHintCommandTests {
         try $0.database.execute(
           sql: """
             CREATE TRIGGER refuse_advisory BEFORE INSERT ON task_event
-            WHEN new.kind='field' AND new.body LIKE 'hinted task %'
+            WHEN new.kind='field'
+              AND new.body='hinted task ' || (SELECT uid FROM task WHERE seq=3)
             BEGIN SELECT RAISE(ABORT,'Acme injected advisory failure'); END;
             """)
       }
-      let command = ["comment", "AC-1", "-m", "Check AC-2."]
+      let command = ["comment", "AC-1", "-m", "Check AC-2 and AC-3."]
       let isolated = try ok(command, in: scratch)
       #expect(try hints(isolated).isEmpty)
       let count = try store.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM comment") }
       #expect(count == 2)
       try store.write { try $0.database.execute(sql: "DROP TRIGGER refuse_advisory") }
       let retried = try ok(command, in: scratch)
-      #expect(try hints(retried).count == 1)
+      #expect(try hints(retried).count == 2)
     }
   }
 
@@ -209,6 +210,8 @@ extension TaskHintCommandTests {
             "Restore Acme's exported workspace.",
           ], in: restored)
         _ = try ok(["ws", "use", "acme"], in: restored)
+        let task = try ok(["task", "show", "AC-1"], in: restored)
+        #expect(try TaskStateCommandTests.data(task)["claimed_by"] == nil)
         let repeated = try ok(mention, in: restored, actor: "agent:codex:other")
         #expect(try hints(repeated).isEmpty)
       }
