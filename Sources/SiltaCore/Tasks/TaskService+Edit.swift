@@ -49,6 +49,11 @@ extension TaskService {
         identity: (environment.ids, at), in: tx)
       var result = receipt(task, warnings: redacted ? [SecretGuard.warning] : [])
       result.changed = content.changed(from: original)
+      let fields = zip(content.values.prefix(4), original.values)
+      let changed: [String] = fields.compactMap { value, prior in
+        value.utf8.elementsEqual(prior.utf8) ? nil : value
+      }
+      result.warnings += taskReferenceWarnings(changed, task: task, workspace: slug, at: at, in: tx)
       return (result, required)
     }
   }

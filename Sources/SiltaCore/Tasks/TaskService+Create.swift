@@ -44,6 +44,10 @@ extension TaskService {
       try used?.record(
         command: audited(command) + " -> " + result.ref, workspace: slug,
         identity: (environment.ids, prepared.at), in: tx)
+      result.warnings += taskReferenceWarnings(
+        [draft.title, draft.description, draft.acceptance],
+        task: try Self.lookup(result.ref, workspace: slug, in: tx.database),
+        workspace: slug, at: prepared.at, in: tx)
       return result
     }
   }

@@ -46,6 +46,7 @@ extension TaskService {
         let gap = try? docGapWarning(task, workspace: slug, in: tx.database)  // advisory only
         warnings += [gap ?? nil].compactMap { $0 }
       }
+      warnings += taskReferenceWarnings([draft.body], task: task, workspace: slug, at: at, in: tx)
       return CommentResult(
         comment: CommentDetails(row: row, task: task.ref), warnings: warnings,
         approvalUsed: consent != nil, released: released)

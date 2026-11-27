@@ -27,7 +27,8 @@ extension TaskService {
         identity: (environment.ids, at), in: tx)
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev + 1, plan: content.0,
-        warnings: content.1 ? [SecretGuard.warning] : [])
+        warnings: (content.1 ? [SecretGuard.warning] : [])
+          + taskReferenceWarnings([content.0], task: task, workspace: slug, at: at, in: tx))
     }
   }
 
@@ -42,20 +43,40 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, workspace: slug, at: at)
       try Self.compareRevision(ifRevision, task: task)
-      let count = MarkdownPlan.checkboxes(task.plan).count
-      guard count > 0, (1...count).contains(step) else {
-        throw TaskError.step(task.ref, checkboxes: count)
+      let boxes = MarkdownPlan.checkboxes(task.plan)
+      guard !boxes.isEmpty, (1...boxes.count).contains(step) else {
+        throw TaskError.step(task.ref, checkboxes: boxes.count)
       }
       let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)
       try changed(
         task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")", at: at, in: tx)
-      var result = TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      let warnings = completionWarnings(task, boxes: boxes, step: step, done: done, workspace: slug)
+      var result = TaskPlanResult(
+        ref: task.ref, planRev: task.planRev, plan: text, warnings: warnings)
       result.step = step
       result.done = done
       result.title = MarkdownPlan.checkboxes(text)[step - 1].title
       return result
     }
+  }
+
+  private func completionWarnings(
+    _ task: TaskDetails, boxes: [MarkdownPlan.Checkbox], step: Int, done: Bool, workspace: String
+  ) -> [OutputWarning] {
+    guard referenceHints, task.status == "doing", done, !boxes[step - 1].done,
+      boxes.lazy.filter({ !$0.done }).prefix(2).count == 1,
+      RestoreService.canNameInRecovery(task.ref), RestoreService.canNameInRecovery(workspace)
+    else { return [] }
+    let scope = "silta --ws " + shellWord(workspace) + " task "
+    let ref = shellWord(task.ref)
+    return [
+      OutputWarning(
+        code: "plan_complete",
+        message: "All plan steps are checked. Submit with `\(scope)submit \(ref)`, or read "
+          + "`\(scope)show \(ref)` and supply the complete revised plan, keeping checked steps, "
+          + "to `\(scope)plan \(ref) --if-rev \(task.planRev) -F -`.")
+    ]
   }
 
   /// A body-free replacement command retains the revision guard in both CLI and core retries.
