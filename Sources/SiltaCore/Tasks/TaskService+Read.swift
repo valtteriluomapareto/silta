@@ -159,9 +159,9 @@ extension TaskService {
         sql: """
           SELECT kind,actor,body,created_at
           FROM task_event
-          WHERE task_id=?
+          WHERE task_id=? AND (kind<>'field' OR body IS NULL OR instr(body,?)<>1)
           ORDER BY id
-          """, arguments: [task.id]
+          """, arguments: [task.id, Self.referenceHintMarker]
       ).map { try Self.safeEvent($0, in: db) }
     }
     return task

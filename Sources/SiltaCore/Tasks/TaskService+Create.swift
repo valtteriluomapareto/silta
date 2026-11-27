@@ -31,6 +31,8 @@ extension TaskService {
     throws -> TaskResult
   {
     let draft = prepared.draft
+    let hintText = referenceHintText(
+      [draft.title, draft.description, draft.acceptance], allowSecret: draft.allowSecret)
     return try environment.db.write { tx in
       let command = draft.command + (draft.allowSecret ? " --allow-secret" : "")
       let retry =
@@ -44,6 +46,10 @@ extension TaskService {
       try used?.record(
         command: audited(command) + " -> " + result.ref, workspace: slug,
         identity: (environment.ids, prepared.at), in: tx)
+      result.warnings += taskReferenceWarnings(
+        hintText,
+        task: try Self.lookup(result.ref, workspace: slug, in: tx.database),
+        workspace: slug, at: prepared.at, in: tx)
       return result
     }
   }

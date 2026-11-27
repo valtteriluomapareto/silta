@@ -126,6 +126,9 @@ extension GuideCommand {
         ```
         Use top-level checkboxes for numbered plan steps. A plan and a result go through stdin \
         with a quoted heredoc, so shell substitutions stay literal.
+        Use a blocker for work that must finish on another task, or a subtask for work you can \
+        delegate. For a step only the human can do, ask in chat if present or send a question to \
+        @me. When every step is checked, submit or revise the full plan, keeping completed steps.
 
         Read workspace document workflows with `silta guide docs`.
 

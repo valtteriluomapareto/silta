@@ -789,6 +789,20 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   HEAD gives no branch evidence. A proven missing ref warns
   `task_branch_missing` even without commit links. A complete-history negative
   for a linked commit in the same repository warns `task_branch_lacks_commit`.
+- CLI task add, task edit, plan replacement and comment can warn
+  `task_ref_unlinked` when newly written prose names an existing, visible task
+  with no link or direct parent relation in either direction. Quoted history,
+  code blocks and URLs are skipped. Up to three first-appearance warnings per
+  receipt show scoped commands to relate the two tasks or, when both statuses and
+  the claim permit it, record a blocker with a reason. Each emitted pair is
+  recorded once using an opaque task identity digest in a portable field event,
+  and omitted from the normal timeline.
+  Advisory errors leave the main write intact. Callers that discard warning
+  receipts leave hints available for a later CLI write.
+- Ticking the last unchecked top-level step of a `doing` task warns
+  `plan_complete`. The receipt offers submit or a revision-checked replacement
+  of the complete plan with the completed steps retained. Repeating a done tick
+  stays quiet. Undoing and completing it again can warn again.
 - **Submit for review:** `task submit AC-12` (doing → review). It takes no body; a
   `status` event's body is always the new status. It releases the claim, so whoever
   reviews and merges can finish the task with `done`; the author takes it back with

@@ -19,7 +19,11 @@ struct TaskPlanTextTests {
         let result = try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(0))
         Golden.forTests().check(result.stdout, golden)
-        #expect(result.stderr.isEmpty)
+        if args.contains("--done") {
+          Golden.forTests().check(result.stderr, "task-plan-complete-warning.txt")
+        } else {
+          #expect(result.stderr.isEmpty)
+        }
       }
       let file = scratch.appending(path: "plan.md")
       try "# Acme import\n\nContext\n\n- First\n  Detail\n- Second\n".write(

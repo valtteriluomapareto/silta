@@ -42,7 +42,7 @@ struct CommentPostCommand: OutputCommand {
       ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: workspace, approved: global.approved,
-      bodyFlag: body.flag
+      bodyFlag: body.flag, referenceHints: true
     ).comment(target, draft, includeWorkspaceInAudit: global.ws != nil)
     return CommandOutput(
       text: result.comment.ref + " " + result.comment.kind

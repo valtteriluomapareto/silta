@@ -34,6 +34,8 @@ extension TaskService {
     }
     let content = safeDocument(safe.map(\.0), from: before)
     let redacted = safe.contains { $0.1 }
+    let hintText = referenceHintText(
+      changedFields(content, from: original), allowSecret: allowSecret)
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
@@ -49,7 +51,17 @@ extension TaskService {
         identity: (environment.ids, at), in: tx)
       var result = receipt(task, warnings: redacted ? [SecretGuard.warning] : [])
       result.changed = content.changed(from: original)
+      result.warnings += taskReferenceWarnings(
+        hintText, task: task, workspace: slug, at: at, in: tx)
       return (result, required)
+    }
+  }
+
+  private func changedFields(
+    _ content: TaskEditDocument, from original: TaskEditDocument
+  ) -> [String] {
+    zip(content.values.prefix(4), original.values).compactMap { value, prior in
+      value.utf8.elementsEqual(prior.utf8) ? nil : value
     }
   }
 
