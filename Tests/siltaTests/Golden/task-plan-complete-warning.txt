@@ -1,0 +1,1 @@
+warning: All plan steps are checked. Submit with `silta --ws 'acme' task submit 'AC-1'`, or read `silta --ws 'acme' task show 'AC-1'` and supply the complete revised plan, keeping checked steps, to `silta --ws 'acme' task plan 'AC-1' --if-rev 1 -F -`. [plan_complete]

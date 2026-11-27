@@ -59,7 +59,8 @@ struct TaskEditCommand: OutputCommand {
     if let app { return try move(to: app, context: context) }
     let service = TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
-      bodyFlag: file.map { _ in "-F <file>" }, retryBodyFlag: file == "-" ? "-F -" : nil)
+      bodyFlag: file.map { _ in "-F <file>" }, retryBodyFlag: file == "-" ? "-F -" : nil,
+      referenceHints: true)
     if print {
       guard file == nil, !allowSecret else {
         throw TaskError.invalid("--print only reads; use it without -F or --allow-secret.")
