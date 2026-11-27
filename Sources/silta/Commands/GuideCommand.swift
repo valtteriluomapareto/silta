@@ -102,6 +102,10 @@ extension GuideCommand {
         silta --ws acme code grep platform-api@origin/api --fetch -- 'Auth'
         silta --ws acme code show platform-api@origin/api -- 'src/Auth.swift'
         ```
+        Link a commit with `task link <task> code:<app>@<full SHA>` and find its tasks with \
+        `task ls --link`. Use `url:<URL>` for a pull request. Task detail and ordinary brief \
+        report commit and branch evidence from the registered clone. Check the observed tip \
+        and refresh explicitly when remote freshness matters.
 
         Use task add for a new task, task plan for a chosen task's checklist, and from-plan to \
         import an existing Markdown plan. An agent's import is proposed, counts against the \
@@ -380,6 +384,8 @@ extension GuideCommand {
         | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix \
         optional except for apps named doc, edge or service; \
         `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+        | Commit | `code:platform-api@<full SHA>` | Task link and task list search accept 40 or 64 \
+        hexadecimal digits. It is stored and shown as `code:<app>@<full SHA>:.`. |
         | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
         | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | \
         relative to the task's review subject |

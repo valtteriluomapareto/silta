@@ -32,6 +32,19 @@ enum TaskOutput {
     "branch": .optional(.string), "worktree": .optional(.string), "done_sha": .optional(.string),
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
     "links": linksShape,
+    "work_evidence": .optional(
+      .object([
+        "commits": .array(
+          .object([
+            "target": .string, "ref": .optional(.string), "tip_sha": .optional(.string),
+            "fetched_at": .optional(.string), "state": .string,
+          ])),
+        "branch": .optional(
+          .object([
+            "name": .string, "source": .string, "state": .string, "tip_sha": .optional(.string),
+          ])),
+        "omitted_commits": .optional(.int),
+      ])),
     "comments": .optional(.array(CommentOutput.shape)),
     "handed_off": .optional(.string), "resolved_threads": .optional(.int),
     "timeline": .optional(
@@ -99,6 +112,7 @@ enum TaskOutput {
     }
     if let sha = task.doneSHA { lines.append("Commit: \(sha)") }
     for link in task.links { lines.append("\(link.rel): \(HumanText.line(link.target))") }
+    lines += task.workEvidence?.lines ?? []
     if let comments = task.comments {
       lines.append("\nDiscussion:")
       lines += comments.map {

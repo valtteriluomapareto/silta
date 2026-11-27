@@ -15,6 +15,8 @@ package struct BriefReport: Encodable, Sendable {
   /// Location diagnostics rendered by the command envelope and recorded in the log.
   package let warnings: [OutputWarning]
 
+  var pendingWorkEvidence: TaskEvidenceInput?
+
   /// Document preview rows actually retained; command-log metadata only.
   package var docsShown = 0
   /// Document totals in retained count-only pointers; command-log metadata only.

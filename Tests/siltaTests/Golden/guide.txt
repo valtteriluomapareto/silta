@@ -17,6 +17,7 @@ Read another app's committed code. When current code matters, use --fetch with a
 silta --ws acme code grep platform-api@origin/api --fetch -- 'Auth'
 silta --ws acme code show platform-api@origin/api -- 'src/Auth.swift'
 ```
+Link a commit with `task link <task> code:<app>@<full SHA>` and find its tasks with `task ls --link`. Use `url:<URL>` for a pull request. Task detail and ordinary brief report commit and branch evidence from the registered clone. Check the observed tip and refresh explicitly when remote freshness matters.
 
 Use task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved. Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files. Don't import or --delete a plan file the repository's instructions require; point the task plan at it.
 ```sh
@@ -134,6 +135,7 @@ Bare task ids are accepted wherever a task is expected. The grammar is used in a
 | Edge | `edge:platform-api/service:push/sdk` | Map attachment target; task links do not accept edges |
 | Service | `service:push` | Map attachment target; task links do not accept services |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional except for apps named doc, edge or service; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+| Commit | `code:platform-api@<full SHA>` | Task link and task list search accept 40 or 64 hexadecimal digits. It is stored and shown as `code:<app>@<full SHA>:.`. |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
 | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |

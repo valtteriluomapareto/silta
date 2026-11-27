@@ -46,7 +46,8 @@ struct TaskKeepCommand: OutputCommand {
 struct TaskLinkCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "link",
-    abstract: "Link a task to a reference in this workspace or an external URL.")
+    abstract: "Link a task to a reference in this workspace or an external URL.",
+    discussion: "Use code:<app>@<full SHA> to link a commit.")
 
   static let dataShape = TaskOutput.receiptShape
 

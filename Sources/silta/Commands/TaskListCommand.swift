@@ -25,6 +25,9 @@ struct TaskListCommand: OutputCommand {
   @Option(help: "Show tasks blocked on this task, ext:party or URL; default is any.")
   var on: String?
 
+  @Option(help: "Show tasks linking an exact URL or commit; default is any.")
+  var link: String?
+
   @Option(help: "Show this topic; default is all.") var topic: String?
 
   @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
@@ -40,6 +43,7 @@ struct TaskListCommand: OutputCommand {
     var filter = TaskFilter()
     filter.status = status
     filter.on = on
+    filter.link = link
     filter.app = app
     filter.topic = topic
     filter.mine = mine

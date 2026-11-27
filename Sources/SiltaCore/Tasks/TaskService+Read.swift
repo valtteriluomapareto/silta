@@ -44,6 +44,9 @@ extension TaskService {
       let appSlug = app?.slug ?? filter.app
       let topicSlug = topic?.slug ?? filter.topic
       if let on = filter.on { _ = try Self.blocker(on, workspace: slug, in: db) }
+      let linkTasks = try filter.link.map {
+        try TaskCommitReference.matchingTaskIDs($0, workspace: id, in: db)
+      }
       let visibility = TaskVisibility(
         actor: environment.actor, at: environment.clock.now(),
         days: WorkspaceSettings.defaultArchiveAfterDays,
@@ -59,6 +62,7 @@ extension TaskService {
       ).map { TaskDetails(row: $0) }.filter {
         (filter.status == nil || filter.status == $0.status)
           && (appSlug == nil || appSlug == $0.app)
+          && (linkTasks?.contains($0.id) ?? true)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)
       }.filter { try Self.matchesBlocker(filter.on, task: $0, workspace: slug, in: db) }
@@ -137,7 +141,7 @@ extension TaskService {
     }
   }
 
-  private func read(_ ref: String, workspace slug: String, timeline: Bool, in db: Database)
+  func read(_ ref: String, workspace slug: String, timeline: Bool, in db: Database)
     throws -> TaskDetails
   {
     var task = try Self.decorate(

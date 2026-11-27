@@ -282,6 +282,8 @@ OPTIONS:
 
 OVERVIEW: Link a task to a reference in this workspace or an external URL.
 
+Use code:<app>@<full SHA> to link a commit.
+
 USAGE: silta task link [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> <target> [--rel <rel>]
 
 ARGUMENTS:
@@ -325,6 +327,8 @@ OPTIONS:
   --app <app>             Show this app; default is all.
   --on <on>               Show tasks blocked on this task, ext:party or URL;
                           default is any.
+  --link <link>           Show tasks linking an exact URL or commit; default is
+                          any.
   --topic <topic>         Show this topic; default is all.
   --mine                  Show tasks created or claimed by this exact actor.
   --proposed              Include other actors' proposals; --status proposed
@@ -393,6 +397,8 @@ OPTIONS:
 ### silta task show
 
 OVERVIEW: Read task bodies, claim, handoff and unresolved discussion.
+
+Linked commits and the recorded branch are checked in the local clone.
 
 USAGE: silta task show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [--timeline]
 

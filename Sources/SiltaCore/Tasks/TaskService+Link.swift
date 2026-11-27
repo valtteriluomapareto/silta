@@ -137,12 +137,13 @@ extension TaskLinkTarget {
     guard let codeAppID, let external else { return false }
     let history = try WorkspaceSlugs.previous(
       String.fetchOne(db, sql: "SELECT previous_slugs FROM app WHERE id=?", arguments: [codeAppID]))
-    guard !history.isEmpty else { return false }
+    let commit = TaskCommitReference("code:" + external, requireRootPath: true)
+    guard commit != nil || !history.isEmpty else { return false }
     let former = Set(
       history.map { slug in
         Data(Self.replacingCodeApp(in: external) { _ in slug }.utf8)
       })
-    return try Data.fetchAll(
+    let stored = try Data.fetchAll(
       db,
       sql: """
         SELECT CAST(to_ext AS BLOB) FROM link
@@ -150,6 +151,14 @@ extension TaskLinkTarget {
           AND to_kind='code' AND to_id IS NULL AND anchor IS NULL AND to_ext IS NOT NULL
         """,
       arguments: [task.workspaceID, task.id, relation]
-    ).contains(where: former.contains)
+    )
+    guard let commit else { return stored.contains(where: former.contains) }
+    let owners = Set(history + [commit.app])
+    return stored.contains { bytes in
+      guard let value = String(bytes: bytes, encoding: .utf8),
+        let other = TaskCommitReference("code:" + value, requireRootPath: true)
+      else { return false }
+      return other.sha == commit.sha && owners.contains(other.app)
+    }
   }
 }

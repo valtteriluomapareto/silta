@@ -12,6 +12,9 @@ package struct TaskFilter: Sendable {
   /// Restricts tasks to those blocked on this stored target identity.
   package var on: String?
 
+  /// Restricts tasks to an exact outgoing URL or immutable whole-tree code link.
+  package var link: String?
+
   /// Shows only tasks created or claimed by this exact actor.
   package var mine = false
 

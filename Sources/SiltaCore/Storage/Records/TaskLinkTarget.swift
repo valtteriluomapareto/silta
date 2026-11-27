@@ -123,9 +123,10 @@ struct TaskLinkTarget {
   }
 
   static func code(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
-    let value = raw.hasPrefix("code:") ? String(raw.dropFirst(5)) : raw
+    let value =
+      TaskCommitReference(raw)?.stored ?? (raw.hasPrefix("code:") ? String(raw.dropFirst(5)) : raw)
     guard let colon = value.firstIndex(of: ":") else {
-      throw TaskError.invalid("Invalid code reference.")
+      throw TaskError.invalid("Use code:<app>:<path> or code:<app>@<full commit SHA>.")
     }
     let owner = value[..<colon].split(
       separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
