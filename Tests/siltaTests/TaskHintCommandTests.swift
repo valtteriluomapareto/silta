@@ -201,6 +201,7 @@ extension TaskHintCommandTests {
       try add(2, in: scratch)
       let mention = ["comment", "AC-1", "-m", "Check AC-2."]
       #expect(try hints(ok(mention, in: scratch)).count == 1)
+      _ = try ok(["task", "submit", "AC-1"], in: scratch)
       let root = scratch.appending(path: "out")
       _ = try ok(["export", "--to", root.path], in: scratch)
       try withScratchDirectory { restored in
