@@ -199,7 +199,7 @@ its target exists or is supported by a command.
 | Edge | `edge:platform-api/service:push/sdk` | Map attachment target; task links do not accept edges |
 | Service | `service:push` | Map attachment target; task links do not accept services |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional except for apps named doc, edge or service; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
-| Commit | `code:platform-api@<full SHA>` | Task link and task list search accept 40 or 64 hexadecimal digits. It is stored and shown as `code:<app>@<full SHA>:.`. |
+| Commit | `code:platform-api@0123456789abcdef0123456789abcdef01234567` | Task link and task list search accept 40 or 64 hexadecimal digits. Stored as a code ref with a literal dot path. |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
 | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |

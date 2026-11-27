@@ -54,7 +54,7 @@ struct GuideReferenceTests {
     "Task": ["task"], "Comment": ["comment"],
     "Doc / revision / comment": ["doc", "doc_rev", "comment"],
     "App, topic": ["app", "topic"], "Edge": ["edge"], "Service": ["service"],
-    "Code": ["code"],
+    "Code": ["code"], "Commit": ["code"],
     "Plan lines": ["task_plan_rev", "task"], "Diff lines": ["diff", "diff"],
     "Note": ["note"], "URL": ["url"], "External party": ["ext"],
   ]
