@@ -22,4 +22,5 @@ docs: none
 open: AC-1 [doing, p2] Acme task
 open: AC-2 [doing, p2] Acme task (app: portal)
 glossary: messages = messaging, push
+branch: elsewhere (claim) missing in cached clone
 more: silta --ws 'acme' task show AC-2

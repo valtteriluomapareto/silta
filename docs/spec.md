@@ -199,6 +199,7 @@ its target exists or is supported by a command.
 | Edge | `edge:platform-api/service:push/sdk` | Map attachment target; task links do not accept edges |
 | Service | `service:push` | Map attachment target; task links do not accept services |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional except for apps named doc, edge or service; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+| Commit | `code:platform-api@0123456789abcdef0123456789abcdef01234567` | Task link and task list search accept 40 or 64 hexadecimal digits. Stored as a code ref with a literal dot path. |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
 | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
@@ -771,6 +772,23 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   holds that state.
 
 **Other rules:**
+- `task ls --link` filters outgoing links by byte-exact `url:` or an immutable
+  whole-tree code ref. It uses the usual task visibility and combines with other
+  filters. Former app slugs and hexadecimal case identify the same commit.
+- `task show` and an ordinary brief with a selected task compare up to three
+  distinct linked commits with the exact configured ref in their registered
+  clones. The optional `work_evidence` detail records the ref, observed tip SHA
+  and separately the last recorded fetch time for tracking refs. Evidence is
+  local. Shallow negatives, ambiguous refs and failed or incomplete reads stay
+  unknown. These reads use bounded Git probes and never fetch. Compact briefs
+  keep the existing task detail pointer. An ordinary brief includes warnings
+  when its evidence section fits.
+- Check the exact local branch of a fresh doing claim, or a safe branch named by
+  the latest live handoff (`Branch:` or `Branch and sha: … at …`).
+  Handoffs with detected secrets give no branch evidence. A detached
+  HEAD gives no branch evidence. A proven missing ref warns
+  `task_branch_missing` even without commit links. A complete-history negative
+  for a linked commit in the same repository warns `task_branch_lacks_commit`.
 - CLI task add, task edit, plan replacement and comment can warn
   `task_ref_unlinked` when newly written prose names an existing, visible task
   with no link or direct parent relation in either direction. Quoted history,

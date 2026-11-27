@@ -31,8 +31,17 @@ package struct BriefService {
         location, app: app, topics: topics, budget: budget, compact: short || hook, at: now, in: $0)
     }
     await addEdgeCommands(to: &report, workspace: location.workspace)
+    let evidence = await report.pendingWorkEvidence?.inspect(using: environment.git)
+    if let evidence {
+      report.sections.append(
+        BriefSection(id: "work_evidence", text: evidence.lines.joined(separator: "\n") + "\n"))
+      report.pendingWorkEvidence = nil
+    }
     report.trim(tokens: budget)
     report.insertDocuments(tokens: budget)
+    if let evidence, report.sections.contains(where: { $0.id == "work_evidence" }) {
+      report.warnings += evidence.warnings
+    }
     return report
   }
 
@@ -114,7 +123,15 @@ package struct BriefService {
         + discussion.inbox + context.sections,
       more: more,
       warnings: (location.git?.warnings ?? []) + settings.warnings + context.warnings
-        + topicWarnings)
+        + topicWarnings,
+      pendingWorkEvidence: workEvidence(compact ? nil : selected, location.workspace, now, db))
+  }
+
+  private func workEvidence(
+    _ task: TaskDetails?, _ workspace: String, _ now: Date, _ db: Database
+  ) -> TaskEvidenceInput? {
+    guard let task else { return nil }
+    return try? TaskEvidenceInput.read(task, workspace: workspace, at: now, in: db)  // Optional.
   }
 
   private func topicSelection(_ words: [String], workspace: Int64, in db: Database) throws

@@ -10,4 +10,5 @@ docs: none
 open: AC-1 [doing, p2] Acme task
 open: AC-3 [doing, p2] Acme task
 done: AC-4
+branch: elsewhere (claim) missing in cached clone
 more: silta --ws 'acme' task show AC-2

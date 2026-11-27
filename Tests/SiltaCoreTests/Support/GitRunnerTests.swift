@@ -59,6 +59,7 @@ struct GitRunnerTests {
         "HTTPS_PROXY": "http://proxy.acme.example", "NO_PROXY": "localhost",
         "XDG_CONFIG_HOME": scratch.appending(path: "config").path, "TMPDIR": scratch.path,
         "GIT_DIR": "ignored", "GIT_SSH_COMMAND": "ignored", "GIT_NO_LAZY_FETCH": "0",
+        "GIT_ALLOW_PROTOCOL": "file:https",
         "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_TERMINAL_PROMPT": "1",
         "LC_ALL": "fi_FI.UTF-8",
       ]
@@ -79,7 +80,10 @@ struct GitRunnerTests {
         "LC_ALL": "C",
         "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
       ]) { _, fixed in fixed }
-      if !lazyFetch { expected["GIT_NO_LAZY_FETCH"] = "1" }
+      if !lazyFetch {
+        expected["GIT_NO_LAZY_FETCH"] = "1"
+        expected["GIT_ALLOW_PROTOCOL"] = ""
+      }
       #expect(actual == expected)
       #expect(result.stderr.isEmpty)
     }

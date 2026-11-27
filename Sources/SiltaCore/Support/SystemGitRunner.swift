@@ -79,7 +79,10 @@ package struct SystemGitRunner: GitRunner {
     process.arguments = request.arguments
     process.currentDirectoryURL = request.directory
     var childEnvironment = environment
-    if !request.lazyFetch { childEnvironment["GIT_NO_LAZY_FETCH"] = "1" }
+    if !request.lazyFetch {
+      childEnvironment["GIT_NO_LAZY_FETCH"] = "1"
+      childEnvironment["GIT_ALLOW_PROTOCOL"] = ""
+    }
     process.environment = childEnvironment
     process.standardInput = FileHandle.nullDevice
     process.standardOutput = stdout

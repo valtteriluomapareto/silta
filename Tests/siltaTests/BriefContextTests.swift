@@ -40,7 +40,7 @@ extension BriefCommandTests {
         ids == [
           "task", "plan", "description", "app", "app", "environments", "docs",
           "neighbours", "docs", "neighbours", "docs", "neighbours", "docs",
-          "open_tasks", "open_tasks", "glossary",
+          "open_tasks", "open_tasks", "glossary", "work_evidence",
         ])
       Golden.forTests().check(normalizeBrief(result.stdout, repo), "brief-context.txt")
       Golden.forTests().check(

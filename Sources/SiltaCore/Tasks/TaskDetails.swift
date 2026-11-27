@@ -96,6 +96,9 @@ package struct TaskDetails: Encodable, Sendable {
   /// The task's typed links.
   package var links: [TaskLink] = []
 
+  /// Optional local Git evidence attached by an explicit task detail read.
+  package var workEvidence: TaskWorkEvidence?
+
   /// Events are included only when timeline was requested.
   package var timeline: [TaskEvent]?
 
@@ -116,6 +119,7 @@ package struct TaskDetails: Encodable, Sendable {
     case resolvedThreads = "resolved_threads"
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
     case acceptance, priority, archived, waiting, parent, comments
+    case workEvidence = "work_evidence"
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case followUpAt = "follow_up_at"
