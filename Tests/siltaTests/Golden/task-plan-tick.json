@@ -1,1 +1,1 @@
-{"data":{"done":true,"plan_rev":1,"ref":"AC-1","step":1,"steps":1,"steps_done":1,"title":"Ship"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"done":true,"plan_rev":1,"ref":"AC-1","step":1,"steps":1,"steps_done":1,"title":"Ship"},"ok":true,"schema":1,"warnings":[{"code":"plan_complete","message":"All plan steps are checked. Submit with `silta --ws 'acme' task submit 'AC-1'`, or read `silta --ws 'acme' task show 'AC-1'` and supply the complete revised plan, keeping checked steps, to `silta --ws 'acme' task plan 'AC-1' --if-rev 1 -F -`."}]}

@@ -41,7 +41,8 @@ extension TaskService {
     var seen = Set<String>()
     var refs: [String] = []
     for text in texts {
-      let lines = String(text.prefix(16_384)).components(separatedBy: "\n")
+      let visible = SecretGuard.redacted(String(text.prefix(16_384)))
+      let lines = visible.components(separatedBy: "\n")
       for index in MarkdownPlan.visibleLines(lines) {
         let line = lines[index]
         let content = line.drop(while: { $0 == " " })

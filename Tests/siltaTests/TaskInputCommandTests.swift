@@ -124,7 +124,7 @@ struct TaskInputCommandTests {
       let ticked = try Self.run(
         ["task", "plan", "AC-1", "--step", "1", "--done", "--json"], in: scratch)
       #expect(ticked.termination == .exit(0))
-      #expect(try Self.warnings(ticked).isEmpty)
+      #expect(try Self.warnings(ticked) == ["plan_complete"])
       let file = scratch.appending(path: "edit.md")
       try Self.document(title: "Acme renamed", plan: "- [x] " + secret).write(
         to: file, atomically: true, encoding: .utf8)

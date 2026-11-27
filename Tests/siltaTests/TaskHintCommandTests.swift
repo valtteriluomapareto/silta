@@ -129,6 +129,21 @@ struct TaskHintCommandTests {
 }
 
 extension TaskHintCommandTests {
+  @Test func retainedSecretContentsAreNotTreatedAsTaskReferences() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      try add(3, in: scratch)
+      let result = try ok(
+        [
+          "comment", "AC-1", "--allow-secret", "--approved", "Keep Acme's fixture text.",
+          "-m", "Pwd=AC-2\nCoordinate with AC-3.",
+        ], in: scratch)
+      let warnings = try hints(result)
+      #expect(warnings.count == 1)
+      #expect(warnings.first?.contains("'task:AC-3'") == true)
+    }
+  }
+
   @Test func editReadsOnlyChangedFields() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
